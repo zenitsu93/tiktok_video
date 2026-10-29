@@ -5,10 +5,10 @@ import { useState } from "react";
 import type { VideoView } from "@/lib/view";
 import { Disc } from "./waits";
 
-/** A send is "moving" while TikTok has not answered, for ten minutes at most. */
+/** A send is "moving" while TikTok has not answered, for twenty minutes at most (the worker follows it fifteen). */
 export function tiktokMoving(v: VideoView): boolean {
   const s = v.tiktok.send;
-  return Boolean(s && (s.status === "sending" || s.status === "processing") && Date.now() - Date.parse(s.at) < 10 * 60_000);
+  return Boolean(s && (s.status === "sending" || s.status === "processing") && Date.now() - Date.parse(s.at) < 20 * 60_000);
 }
 
 /**
@@ -31,7 +31,9 @@ export function TikTokSend({ v, onQueued, flash }: { v: VideoView; onQueued: () 
   const current = send?.current ? send : null;
   const moving = pending || tiktokMoving(v);
   const sent = current?.status === "inbox";
-  const stage = pending || current?.status === "sending" ? "sending" : current?.status === "processing" ? "processing" : sent ? "done" : "idle";
+  const stage = pending || current?.status === "sending" ? "sending" : current?.status === "processing" && moving ? "processing" : sent ? "done" : "idle";
+  // TikTok never confirmed, but such a video usually lands anyway
+  const unconfirmed = current?.status === "processing" && !moving;
 
   async function go() {
     setPending(true);
@@ -72,6 +74,12 @@ export function TikTokSend({ v, onQueued, flash }: { v: VideoView; onQueued: () 
         <span className="chip ok" title="App TikTok, Boîte de réception : ouvre la notification, ajoute le son, colle la légende, puis publie">
           <span className="dot" />
           Dans ta boîte de réception TikTok
+        </span>
+      )}
+      {unconfirmed && (
+        <span className="chip" title="Regarde dans l'app TikTok avant de renvoyer, pour ne pas l'avoir en double">
+          <span className="dot" />
+          TikTok n&apos;a pas confirmé : regarde dans ta boîte de réception
         </span>
       )}
       {current?.status === "error" && current.error && (
