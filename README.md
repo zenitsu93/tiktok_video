@@ -35,6 +35,8 @@ Le bouton « Envoyer sur TikTok », à côté de « Télécharger MP4 », met le
 
 Le bouton « Supprimer » (sur la vidéo, sur la page de lecture et sur chaque ligne de l'accueil) demande une confirmation. Il efface la vidéo, ses versions et les fichiers que plus rien n'utilise. L'historique des dépenses, lui, reste.
 
+Chaque nuit, les vidéos qui n'ont pas bougé depuis 30 jours partent de la même façon, pour que le disque du serveur ne se remplisse pas. Le délai se règle avec `RETENTION_DAYS` (0 garde tout). Une vidéo en cours de génération ou de rendu n'est jamais touchée.
+
 ## Lancer en local
 
 Il faut Node 22, pnpm 10, Postgres 16 et ffmpeg.
@@ -68,6 +70,7 @@ Elles vont dans les variables d'environnement du serveur, et nulle part ailleurs
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | la connexion, obligatoire en production |
 | `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET` | l'envoi dans la boîte TikTok (facultatif) |
 | `BUDGET_DAY_USD`, `BUDGET_VIDEO_USD` | les plafonds de dépense (5 $ par jour, 2 $ par vidéo par défaut) |
+| `RETENTION_DAYS` | le délai avant la suppression automatique d'une vidéo qui n'a pas bougé (30 jours par défaut, 0 pour tout garder) |
 
 Pour TikTok, l'app se crée sur [developers.tiktok.com](https://developers.tiktok.com), en mode Sandbox, avec Login Kit et Content Posting API, et le seul scope `video.upload` en plus de `user.info.basic`. Mon compte TikTok est ajouté dans « Target users ». La Redirect URI est `https://ton-domaine/auth/tiktok/callback`, forcément en https. Les pages demandées par le portail existent déjà : `/legal/conditions` et `/legal/confidentialite`. L'icône 1024 × 1024 est `brand/icones/icon-1024.png`. Si le portail demande de vérifier l'adresse, le fichier `tiktok….txt` qu'il donne va dans `apps/web/public/`. TikTok accepte cinq envois en attente au plus par 24 heures. Les jetons TikTok sont chiffrés dans la base et ne sortent pas du serveur.
 

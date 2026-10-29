@@ -84,6 +84,15 @@ export async function setRendered(db: Db, id: string, renderAsset: string, scene
   await db.update(videos).set({ renderAsset, renderedScenes: scenes, updatedAt: new Date() }).where(eq(videos.id, id));
 }
 
+/** Videos nobody has touched for `days` days; one a job is working on stays. */
+export async function staleVideos(db: Db, days: number): Promise<string[]> {
+  const rows = await db
+    .select({ id: videos.id })
+    .from(videos)
+    .where(and(lt(videos.updatedAt, sql`now() - make_interval(days => ${days})`), sql`${videos.status} not in ('generating', 'rendering')`));
+  return rows.map((r) => r.id);
+}
+
 /**
  * Deletes a video for good: its row and saved versions, then the files nothing points
  * to any more (its images, voice clips and exports, the scene clips of its last export).

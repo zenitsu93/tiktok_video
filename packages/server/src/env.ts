@@ -50,6 +50,9 @@ const schema = z.object({
 
   BUDGET_DAY_USD: z.coerce.number().positive().default(5),
   BUDGET_VIDEO_USD: z.coerce.number().positive().default(2),
+
+  /** A video untouched for this many days is deleted, with its files; 0 keeps everything. */
+  RETENTION_DAYS: z.coerce.number().int().min(0).default(30),
 });
 
 export type Env = z.infer<typeof schema>;
