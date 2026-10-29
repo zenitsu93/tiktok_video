@@ -50,10 +50,22 @@ export function route<C>(fn: (req: NextRequest, ctx: C) => Promise<Response>) {
   };
 }
 
-function checkOrigin(req: NextRequest) {
+/**
+ * An address in the app. Behind a reverse proxy, route handlers see the server's own
+ * address in req.url (https://localhost:3000), so redirects are built from APP_URL.
+ */
+export function appUrl(path: string): URL {
+  return new URL(path, env().APP_URL);
+}
+
+/** The request comes from the app's own pages (APP_URL, or the address it came in on in development). */
+export function fromApp(req: NextRequest): boolean {
   const origin = req.headers.get("origin");
-  const allowed = new Set([new URL(env().APP_URL).origin, req.nextUrl.origin]);
-  if (!origin || !allowed.has(origin)) throw new HttpError(403, "Origine refusée.");
+  return !!origin && new Set([new URL(env().APP_URL).origin, req.nextUrl.origin]).has(origin);
+}
+
+function checkOrigin(req: NextRequest) {
+  if (!fromApp(req)) throw new HttpError(403, "Origine refusée.");
   if (req.headers.get("sec-fetch-site") && req.headers.get("sec-fetch-site") !== "same-origin") throw new HttpError(403, "Origine refusée.");
 }
 
