@@ -43,12 +43,18 @@ export function queue(): Promise<PgBoss> {
   return boss;
 }
 
+/** How many times a failed job is tried again before the video shows an error. */
+export const retryLimit = (name: JobName) => (name === JOBS.generate || name === JOBS.render ? 4 : 3);
+
 export async function enqueue<N extends JobName>(name: N, data: JobData<N>): Promise<string | null> {
   const parsed = jobData[name].parse(data);
   const b = await queue();
   return b.send(name, parsed, {
-    retryLimit: name === JOBS.generate ? 1 : 2,
-    retryDelay: 5,
+    // spaced retries (10 s, 20 s, 40 s…) ride out a few minutes without internet;
+    // the pipeline skips what is already done, so a retry does not pay twice
+    retryLimit: retryLimit(name),
+    retryDelay: 10,
+    retryBackoff: true,
     singletonKey: name === JOBS.render ? (parsed as JobData<typeof JOBS.render>).videoId : undefined,
   });
 }

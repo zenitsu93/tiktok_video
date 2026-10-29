@@ -1,5 +1,5 @@
-import { closeDb, getDb, setError, setStatus } from "@regie/db";
-import { BudgetError, env, jobData, JOBS, providers, queue, type JobName } from "@regie/server";
+import { closeDb, getDb, setError, setProgress, setStatus } from "@regie/db";
+import { BudgetError, env, jobData, JOBS, providers, queue, retryLimit, type JobName } from "@regie/server";
 import { generate, moreImages, render, revoice, rewrite } from "./pipeline";
 
 /**
@@ -27,9 +27,15 @@ function handle<N extends JobName>(name: N, concurrency: number, fn: (data: neve
     try {
       await fn(data as never);
     } catch (e) {
-      await fail(data.videoId, e, fatal);
       // budget and configuration errors will not fix themselves: do not retry
-      if (!(e instanceof BudgetError)) throw e;
+      if (e instanceof BudgetError) return void (await fail(data.videoId, e, fatal));
+      // another attempt is coming: keep the video in progress rather than showing an error
+      if (fatal && job!.retryCount < retryLimit(name)) {
+        console.error(`[worker] ${data.videoId}: essai ${job!.retryCount + 1} raté, nouvel essai`, e);
+        const wait = 10 * 2 ** job!.retryCount;
+        await setProgress(getDb(), data.videoId, { step: `Connexion perdue · nouvel essai dans ~${wait} s`, done: 0, total: 1 });
+      } else await fail(data.videoId, e, fatal);
+      throw e;
     }
   });
 }
