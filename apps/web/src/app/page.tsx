@@ -1,5 +1,6 @@
 import { getDb, listVideos } from "@regie/db";
 import { providers } from "@regie/server";
+import { Gauge } from "lucide-react";
 import Link from "next/link";
 import { LaunchForm } from "@/components/launch-form";
 import { StatusChip } from "@/components/status";
@@ -17,11 +18,16 @@ export default async function Home() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.svg" alt="Thomas" width={44} height={44} />
-        <form action="/auth/logout" method="post">
-          <button className="btn ghost sm" type="submit">
-            Déconnexion
-          </button>
-        </form>
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          <Link href="/conso" className="btn ghost sm">
+            <Gauge size={15} /> Conso
+          </Link>
+          <form action="/auth/logout" method="post">
+            <button className="btn ghost sm" type="submit">
+              Déconnexion
+            </button>
+          </form>
+        </div>
       </div>
       <h1>
         Quelle <span>chanson ?</span>
