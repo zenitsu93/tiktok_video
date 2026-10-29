@@ -74,7 +74,8 @@ export async function searchPinterest(videoId: string, query: string, limit: num
     {
       method: "POST",
       headers: { authorization: `Bearer ${e.APIFY_TOKEN}`, "content-type": "application/json" },
-      body: JSON.stringify({ searchQueries: [query], maxItems: limit, maxResults: limit }),
+      // maxPins is the actor's only limit; without it every search bills 50 pins
+      body: JSON.stringify({ searchQueries: [query], maxPins: limit }),
       signal: AbortSignal.timeout(150_000),
     },
   );
