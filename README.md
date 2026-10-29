@@ -31,7 +31,9 @@ Corriger un plan ne relance pas tout. Changer une image, un effet ou le mot en g
 - **Le Fil** : le script est l'interface. À gauche les phrases, à droite l'aperçu en direct dans un cadre de téléphone et ce que la vidéo a coûté. Un clic ouvre un plan, un deuxième clic le referme. Chaque plan peut passer en italique. L'aperçu passe en plein écran. En bas, la barre de correction (touche `/`). Les flèches haut et bas passent d'une phrase à l'autre. « Annuler » revient à l'état d'avant, à chaque fois.
 - **Conso** : ce que coûtent Claude, ElevenLabs et Apify sur 7, 14 ou 30 jours, par jour et par vidéo, face aux plafonds.
 
-Le bouton « Envoyer sur TikTok », à côté de « Télécharger MP4 », met le dernier export dans ma boîte de réception TikTok, sans musique. J'ouvre la notification dans l'app TikTok, j'ajoute le son, et je publie. Il faut d'abord connecter TikTok une fois (bouton « Connecter TikTok »). La marche à suivre sur le portail développeur TikTok est plus bas.
+Le bouton « Envoyer sur TikTok », à côté de « Télécharger MP4 », met le dernier export dans ma boîte de réception TikTok, sans musique. J'ouvre la notification dans l'app TikTok (Boîte de réception, pas les brouillons), j'ajoute le son, et je publie. Il faut d'abord connecter TikTok une fois (bouton « Connecter TikTok »). La marche à suivre sur le portail développeur TikTok est plus bas.
+
+L'envoi ne porte aucun texte : TikTok ne prend que le fichier. Sous l'aperçu, la « Légende TikTok » donne une ou deux phrases et les hashtags, écrites par Claude à la fin de la génération à partir du script. « Copier », puis je la colle dans TikTok en ajoutant le son. « Réécrire » la refait à partir du script tel qu'il est maintenant.
 
 Le bouton « Supprimer » (sur la vidéo, sur la page de lecture et sur chaque ligne de l'accueil) demande une confirmation. Il efface la vidéo, ses versions et les fichiers que plus rien n'utilise. L'historique des dépenses, lui, reste.
 

@@ -5,6 +5,7 @@ import { ArrowLeft, Download, Image as ImageIcon, Loader2, Maximize2, Mic, Minim
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BeatView, VideoView } from "@/lib/view";
+import { Caption } from "./caption";
 import { DeleteVideo } from "./delete-video";
 import { Lecture } from "./lecture";
 import { TikTokSend, tiktokMoving } from "./tiktok-send";
@@ -497,6 +498,7 @@ export function Fil({ initial }: { initial: VideoView }) {
             </button>
           </div>
         </div>
+        <Caption v={v} flash={flash} write={() => run(() => call(`${url}/caption`, "POST").then(refresh), "Claude écrit la légende")} />
         <Costs v={v} />
       </aside>
 
