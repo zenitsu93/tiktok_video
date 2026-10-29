@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: regie
       POSTGRES_DB: regie
     volumes: [pgdata:/var/lib/postgresql/data]
-    ports: ["127.0.0.1:5432:5432"]
+    ports: ["127.0.0.1:${DB_PORT:-5432}:5432"]
   web:
     build: { context: ., dockerfile: docker/Dockerfile.web }
     env_file: .env
