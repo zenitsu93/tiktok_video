@@ -3,9 +3,9 @@ import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 /**
- * The video font. Kaneda Gothic is not free, so its files never go in the
- * repository: drop them in brand/fonts/kaneda/ (ignored by git) and the videos
- * use them. Without them, videos fall back to Oswald (bundled, SIL OFL).
+ * The video font. Kaneda Gothic lives in brand/fonts/kaneda/ (committed: the
+ * repository is private and the font is not free). If a weight is missing,
+ * videos fall back to Oswald (bundled, SIL OFL).
  */
 const KANEDA: Record<(typeof FONT_WEIGHTS)[number], RegExp> = {
   200: /extra[\s_-]?light/i,

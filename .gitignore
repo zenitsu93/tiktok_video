@@ -13,3 +13,4 @@ renders/
 # commercial font files, each person brings their own
 brand/fonts/kaneda/*
 !brand/fonts/kaneda/README.md
+!brand/fonts/kaneda/kaneda-gothic-*.otf

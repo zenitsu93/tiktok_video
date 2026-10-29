@@ -1,15 +1,13 @@
 # Kaneda Gothic
 
-Les vidéos utilisent Kaneda Gothic quand ses fichiers sont dans ce dossier. Ce n'est pas une police libre, donc git ignore tout ici sauf ce fichier : chacun y met ses propres fichiers sous licence.
+Les vidéos utilisent Kaneda Gothic. Les cinq graisses utiles sont dans ce dossier, versionnées dans le dépôt (qui est privé) : rien à copier à la main.
 
-Il faut les cinq graisses suivantes (`.otf`, `.ttf`, `.woff` ou `.woff2`, le nom exact importe peu tant qu'il contient la graisse) :
-
-| Dans le nom | Sert à |
+| Fichier | Sert à |
 | --- | --- |
-| ExtraLight | textes très fins |
-| Light | mots de liaison |
-| Regular | lignes parlées |
-| Bold | phrases sans mot héros |
-| Black | mot héros |
+| `kaneda-gothic-extralight.otf` | textes très fins |
+| `kaneda-gothic-light.otf` | mots de liaison |
+| `kaneda-gothic-regular.otf` | lignes parlées |
+| `kaneda-gothic-bold.otf` | phrases sans mot héros |
+| `kaneda-gothic-black.otf` | mot héros |
 
-Sans ces fichiers, les vidéos restent en Oswald. Après en avoir ajouté, relance `pnpm dev` (l'app recopie la police et le worker la relit au démarrage). Les plans déjà rendus en Oswald repassent au rendu à l'export suivant.
+Ce n'est pas une police libre : garde le dépôt privé, et prends une licence avant une diffusion commerciale. Pour changer de fichiers, remplace-les ici en gardant un nom qui contient la graisse ; sans les cinq, les vidéos repassent en Oswald.
