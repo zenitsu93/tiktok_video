@@ -2,6 +2,7 @@ import { getDb, listVideos } from "@regie/db";
 import { providers } from "@regie/server";
 import { Gauge } from "lucide-react";
 import Link from "next/link";
+import { DeleteVideo } from "@/components/delete-video";
 import { LaunchForm } from "@/components/launch-form";
 import { StatusChip } from "@/components/status";
 import { ownerOrLogin } from "@/lib/owner";
@@ -44,15 +45,18 @@ export default async function Home() {
           <span className="eyebrow">Tes vidéos</span>
           <nav className="vlist">
             {videos.map((v) => (
-              <Link key={v.id} href={`/v/${v.id}`}>
-                <span className="t">
-                  {v.title} <span>· {v.artist}</span>
-                </span>
-                <StatusChip status={v.status} />
-                <span className="mute" style={{ fontSize: 13 }}>
-                  {new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(v.updatedAt)}
-                </span>
-              </Link>
+              <div key={v.id} className="vrow">
+                <Link href={`/v/${v.id}`}>
+                  <span className="t">
+                    {v.title} <span>· {v.artist}</span>
+                  </span>
+                  <StatusChip status={v.status} />
+                  <span className="mute" style={{ fontSize: 13 }}>
+                    {new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(v.updatedAt)}
+                  </span>
+                </Link>
+                <DeleteVideo id={v.id} short />
+              </div>
             ))}
           </nav>
         </section>

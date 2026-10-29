@@ -5,6 +5,7 @@ import { ArrowLeft, Download, Image as ImageIcon, Loader2, Maximize2, Mic, Minim
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BeatView, VideoView } from "@/lib/view";
+import { DeleteVideo } from "./delete-video";
 import { Lecture } from "./lecture";
 import { StatusChip } from "./status";
 import { chime, Fan, Grooves, LineBusy, Platine, Sleeve, stageOf } from "./waits";
@@ -337,6 +338,7 @@ export function Fil({ initial }: { initial: VideoView }) {
                 <Download size={15} />
               </a>
             )}
+            <DeleteVideo id={v.id} />
           </div>
           {firstRun ? (
             <Platine
@@ -403,7 +405,7 @@ export function Fil({ initial }: { initial: VideoView }) {
 
         {v.sources.length > 0 && (
           <details className="panel" style={{ marginTop: 10 }}>
-            <summary style={{ cursor: "pointer", fontWeight: 400 }}>Sources du script ({v.sources.length})</summary>
+            <summary>Sources du script ({v.sources.length})</summary>
             <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 13 }}>
               {v.sources.map((s) => (
                 <li key={s} style={{ overflowWrap: "anywhere" }}>
@@ -455,7 +457,16 @@ export function Fil({ initial }: { initial: VideoView }) {
             <button className="btn sm" onClick={() => post({ type: playing ? "regie:pause" : "regie:play" })} aria-label={playing ? "Pause" : "Lecture"}>
               {playing ? <Pause size={15} /> : <Play size={15} />}
             </button>
-            <input type="range" min={0} max={Math.max(0.1, v.total)} step={0.05} value={Math.min(t, v.total)} onChange={(e) => seekTo(Number(e.target.value))} aria-label="Position" />
+            <input
+              type="range"
+              min={0}
+              max={Math.max(0.1, v.total)}
+              step={0.05}
+              value={Math.min(t, v.total)}
+              onChange={(e) => seekTo(Number(e.target.value))}
+              aria-label="Position"
+              style={{ "--fill": `${(Math.min(t, v.total) / Math.max(0.1, v.total)) * 100}%` } as React.CSSProperties}
+            />
             <span className="mono mute">{tc(t)}</span>
             <button className="btn sm" onClick={toggleFull} aria-label={full ? "Quitter le plein écran" : "Plein écran"} title={full ? "Quitter le plein écran (Échap)" : "Plein écran"}>
               {full ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
@@ -562,6 +573,13 @@ function Inspector({
 }) {
   const [text, setText] = useState(b.text);
   useEffect(() => setText(b.text), [b.text]);
+  // the instruction for Claude, asked in place (null when the box is closed)
+  const [ask, setAsk] = useState<string | null>(null);
+  const sendAsk = () => {
+    if (!ask?.trim()) return;
+    action("rewrite", ask.trim(), "Claude retouche la phrase…");
+    setAsk(null);
+  };
   const words = b.text.split(/\s+/).map((w) => w.replace(/^[«"“(]+|[.,;:!?…»"”)]+$/g, "")).filter(Boolean);
   const changed = text.trim() !== b.text;
   const imageLayouts = b.layout === "card" || b.layout === "cutout";
@@ -670,7 +688,18 @@ function Inspector({
           </button>
           <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14 }}>
             Pause après
-            <input type="range" min={0} max={3} step={0.1} defaultValue={b.gap} key={`${b.id}-${b.gap}`} onPointerUp={(e) => patch({ gap: Number((e.target as HTMLInputElement).value) })} onKeyUp={(e) => patch({ gap: Number((e.target as HTMLInputElement).value) })} style={{ accentColor: "var(--accent)" }} />
+            <input
+              type="range"
+              min={0}
+              max={3}
+              step={0.1}
+              defaultValue={b.gap}
+              key={`${b.id}-${b.gap}`}
+              style={{ "--fill": `${(b.gap / 3) * 100}%` } as React.CSSProperties}
+              onInput={(e) => e.currentTarget.style.setProperty("--fill", `${(Number(e.currentTarget.value) / 3) * 100}%`)}
+              onPointerUp={(e) => patch({ gap: Number((e.target as HTMLInputElement).value) })}
+              onKeyUp={(e) => patch({ gap: Number((e.target as HTMLInputElement).value) })}
+            />
             <span className="mono">{b.gap.toFixed(1)} s</span>
           </label>
         </div>
@@ -680,19 +709,46 @@ function Inspector({
         <button className="btn sm" disabled={busy} onClick={() => action("voice", undefined, "La voix de cette phrase se refait")}>
           <Mic size={14} /> Refaire la voix
         </button>
-        {v.providers.claude && (
-          <button
-            className="btn sm"
-            disabled={busy}
-            onClick={() => {
-              const i = window.prompt("Que doit changer Claude sur cette phrase ?");
-              if (i?.trim()) action("rewrite", i.trim(), "Claude retouche la phrase…");
-            }}
-          >
+        {v.providers.claude && ask === null && (
+          <button className="btn sm" disabled={busy} onClick={() => setAsk("")}>
             <Wand2 size={14} /> Retoucher avec Claude
           </button>
         )}
       </div>
+      {ask !== null && (
+        <form
+          className="ask"
+          onSubmit={(e) => {
+            e.preventDefault();
+            sendAsk();
+          }}
+        >
+          <label htmlFor={`ask-${b.id}`}>Que doit changer Claude sur cette phrase ?</label>
+          <textarea
+            id={`ask-${b.id}`}
+            autoFocus
+            value={ask}
+            maxLength={1000}
+            placeholder="« plus court », « une image plus ancienne », « mets l'accent sur la date »…"
+            onChange={(e) => setAsk(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setAsk(null);
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendAsk();
+              }
+            }}
+          />
+          <div className="chips">
+            <button className="btn primary sm" type="submit" disabled={busy || !ask.trim()}>
+              <Wand2 size={14} /> Envoyer à Claude
+            </button>
+            <button className="btn ghost sm" type="button" onClick={() => setAsk(null)}>
+              Annuler
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }
