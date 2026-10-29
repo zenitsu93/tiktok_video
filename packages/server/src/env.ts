@@ -36,6 +36,10 @@ const schema = z.object({
   APIFY_TOKEN: optional,
   APIFY_PINTEREST_ACTOR: z.string().default("automation-lab~pinterest-scraper"),
 
+  /** TikTok app (Login Kit + Content Posting API, video.upload only): sends exports to the TikTok inbox. */
+  TIKTOK_CLIENT_KEY: optional,
+  TIKTOK_CLIENT_SECRET: optional,
+
   STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
   STORAGE_DIR: z.string().default("./data"),
   S3_ENDPOINT: optional,

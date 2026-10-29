@@ -80,3 +80,35 @@ export const usage = pgTable(
   },
   (t) => [index("usage_video_idx").on(t.videoId), index("usage_created_idx").on(t.createdAt)],
 );
+
+/** The owner's TikTok connection, one row. Both tokens are sealed (AES-GCM) before they get here. */
+export const tiktokAuth = pgTable("tiktok_auth", {
+  id: text("id").primaryKey(),
+  openId: text("open_id").notNull(),
+  scope: text("scope").notNull(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  refreshExpiresAt: timestamp("refresh_expires_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type TikTokSendStatus = "sending" | "processing" | "inbox" | "error";
+
+/** Each export sent to the TikTok inbox, newest last. */
+export const tiktokSends = pgTable(
+  "tiktok_sends",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    videoId: uuid("video_id")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    renderAsset: text("render_asset").notNull(),
+    publishId: text("publish_id"),
+    status: text("status").$type<TikTokSendStatus>().notNull().default("sending"),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("tiktok_sends_video_idx").on(t.videoId, t.createdAt)],
+);

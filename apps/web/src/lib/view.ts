@@ -1,6 +1,6 @@
 import { timeBeats, voiceStale, type Beat, type Layout, type Entrance } from "@regie/core";
-import { getDb, videoCosts, type VideoRow } from "@regie/db";
-import { dirtyBeats, providers, signMedia } from "@regie/server";
+import { getDb, lastTikTokSend, videoCosts, type TikTokSendStatus, type VideoRow } from "@regie/db";
+import { dirtyBeats, providers, signMedia, tiktokConfigured, tiktokConnected } from "@regie/server";
 
 /** What the browser gets for one video: the script, timings, signed image links, costs. No secrets, no storage keys. */
 export interface BeatView {
@@ -44,6 +44,13 @@ export interface VideoView {
   costs: { provider: string; operation: string; calls: number; cost: number }[];
   spent: number;
   providers: { claude: boolean; voice: boolean; images: boolean };
+  tiktok: {
+    /** TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET are set on the server. */
+    configured: boolean;
+    connected: boolean;
+    /** The last send; `current` is false once a newer export exists. */
+    send: { status: TikTokSendStatus; error: string | null; at: string; current: boolean } | null;
+  };
 }
 
 const slug = (s: string) =>
@@ -66,6 +73,8 @@ export async function videoView(row: VideoRow): Promise<VideoView> {
     const a = doc.assets[id];
     if (a?.kind === "image") images[id] = { url: signMedia(id, 6 * 3600), accent: a.accent ?? null, w: a.width, h: a.height };
   }
+  const send = await lastTikTokSend(getDb(), row.id);
+  const configured = tiktokConfigured();
   const costs = (await videoCosts(getDb(), row.id)).map((c) => ({ ...c, cost: Number(c.cost) }));
   return {
     id: row.id,
@@ -105,5 +114,12 @@ export async function videoView(row: VideoRow): Promise<VideoView> {
     costs,
     spent: costs.reduce((s, c) => s + c.cost, 0),
     providers: providers(),
+    tiktok: {
+      configured,
+      connected: configured && (await tiktokConnected(getDb())),
+      send: send
+        ? { status: send.status, error: send.error, at: send.createdAt.toISOString(), current: send.renderAsset === row.renderAsset }
+        : null,
+    },
   };
 }

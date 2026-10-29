@@ -37,6 +37,8 @@ for (const [n, s] of [["icon-192.png", 192], ["icon-512.png", 512], ["apple-touc
   await shot(sized(src, s, s), `icones/${n}`, s, s, !n.startsWith("apple"));
 }
 await shot(sized(svg("icones/icon-maskable.svg"), 512, 512), "icones/icon-maskable-512.png", 512, 512);
+// the TikTok developer portal wants an opaque 1024 × 1024 app icon
+await shot(sized(svg("logo/thomas-avatar.svg"), 1024, 1024), "icones/icon-1024.png", 1024, 1024);
 execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", join(B, "icones/favicon-48.png"), "-i", join(B, "icones/favicon-32.png"), "-i", join(B, "icones/favicon-16.png"), "-map", "0", "-map", "1", "-map", "2", join(B, "icones/favicon.ico")]);
 
 // ---- social previews and GitHub cover

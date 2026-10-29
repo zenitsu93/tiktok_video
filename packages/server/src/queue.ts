@@ -16,6 +16,8 @@ export const JOBS = {
   rewrite: "beat-rewrite",
   /** Export the MP4, re-rendering only the scenes that changed. */
   render: "video-render",
+  /** Send the last export to the owner's TikTok inbox. */
+  tiktok: "tiktok-send",
 } as const;
 
 export const jobData = {
@@ -25,6 +27,7 @@ export const jobData = {
   [JOBS.script]: z.object({ videoId: z.string().uuid(), instruction: z.string().min(1).max(1000) }),
   [JOBS.rewrite]: z.object({ videoId: z.string().uuid(), beatId: z.string(), instruction: z.string().min(1).max(500) }),
   [JOBS.render]: z.object({ videoId: z.string().uuid() }),
+  [JOBS.tiktok]: z.object({ videoId: z.string().uuid(), sendId: z.string().uuid() }),
 };
 
 export type JobName = (typeof JOBS)[keyof typeof JOBS];
@@ -47,7 +50,8 @@ export function queue(): Promise<PgBoss> {
 }
 
 /** How many times a failed job is tried again before the video shows an error. */
-export const retryLimit = (name: JobName) => (name === JOBS.generate || name === JOBS.render ? 4 : 3);
+// a TikTok send is never retried on its own: a second try could land a second copy in the inbox
+export const retryLimit = (name: JobName) => (name === JOBS.tiktok ? 0 : name === JOBS.generate || name === JOBS.render ? 4 : 3);
 
 export async function enqueue<N extends JobName>(name: N, data: JobData<N>): Promise<string | null> {
   const parsed = jobData[name].parse(data);
