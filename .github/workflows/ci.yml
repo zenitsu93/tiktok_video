@@ -1,9 +1,15 @@
+# Tests à chaque push et PR. Sur main, l'image Docker (app et worker) est publiée sur ghcr.io,
+# puis le VPS la tire et relance la pile (deploy/deploy.sh). Guide : deploy/README.md.
 name: CI
 on:
   push: { branches: [main] }
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -22,3 +28,78 @@ jobs:
           MEDIA_SECRET: ci-only-not-a-secret-ci-only-not-a-secret-2
           GITHUB_CLIENT_ID: ci
           GITHUB_CLIENT_SECRET: ci
+
+  image:
+    name: Image Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Sur une PR, l'image est seulement construite ; sur main, elle est publiée (privée, comme le dépôt).
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:latest
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Déploiement (VPS)
+    needs: [check, image]
+    # Sur main, une fois le serveur déclaré (variable VPS_HOST).
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.VPS_HOST != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://regie.2nbdigital.com
+    steps:
+      - name: Préparer la clé SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      # La clé n'ouvre aucun shell : le serveur lance deploy/deploy.sh avec le commit demandé.
+      # Le jeton du job (lecture des paquets, expire avec le job) passe par l'entrée standard.
+      - name: Déployer
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$TOKEN" | ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" "$GITHUB_SHA"
+
+      - name: Vérifier le site
+        run: |
+          for i in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' https://regie.2nbdigital.com/login) || true
+            [ "$code" = 200 ] && exit 0
+            sleep 10
+          done
+          echo "https://regie.2nbdigital.com/login répond $code" >&2
+          exit 1

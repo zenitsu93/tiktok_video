@@ -1,0 +1,18 @@
+# Site de Régie, importé par le Caddy de 2nb-prospect (seul sur les ports 80 et 443 du VPS).
+# deploy/deploy.sh le copie dans son dossier de sites (/home/christian/caddy-sites) et recharge Caddy.
+regie.2nbdigital.com {
+	encode zstd gzip
+
+	header -Server
+
+	reverse_proxy regie-web:3000
+
+	log {
+		output stdout
+		format filter {
+			wrap console
+			request>headers>Cookie delete
+			request>headers>Authorization delete
+		}
+	}
+}
