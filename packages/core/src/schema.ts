@@ -100,6 +100,8 @@ export const videoDocSchema = z.object({
   assets: z.record(z.string(), assetSchema),
   /** Fact sources returned with the script, shown under the script. */
   sources: z.array(z.string().max(400)).max(20),
+  /** The script as Claude wrote it, kept until it is split, so a retry after a cut does not pay for it twice. */
+  draft: z.string().max(40_000).nullable().optional(),
 });
 export type VideoDoc = z.infer<typeof videoDocSchema>;
 

@@ -170,25 +170,40 @@ function toBeats(rows: { text: string; hero: string; layout: Beat["layout"]; ima
   });
 }
 
+/**
+ * The whole pipeline. Every step is saved as soon as it is done and skipped when
+ * it already is, so a retry after a lost connection picks up where it stopped:
+ * the script is not paid for twice, voiced lines and found images are kept.
+ */
 export async function generate(videoId: string) {
   const row = await load(videoId);
   await setStatus(db(), videoId, "generating", { step: "Écriture du script", done: 0, total: 1 });
 
-  const { beats: rows, sources } = providers().claude
-    ? await (async () => {
-        const { script, sources } = await writeScript(videoId, { title: row.doc.title, artist: row.doc.artist, angle: row.doc.angle });
-        await setProgress(db(), videoId, { step: "Découpage en plans", done: 0, total: 1 });
-        return { beats: await splitScript(videoId, script), sources };
-      })()
-    : demoScript(row.doc.title, row.doc.artist);
-  const beats = toBeats(rows);
-  await mutateDoc(db(), videoId, "script", (d) => ({ ...d, beats, sources }));
+  let beats = row.doc.beats;
+  if (!beats.length) {
+    const { beats: rows, sources } = providers().claude
+      ? await (async () => {
+          let script = row.doc.draft ?? null;
+          let sources = row.doc.sources;
+          if (!script) {
+            ({ script, sources } = await writeScript(videoId, { title: row.doc.title, artist: row.doc.artist, angle: row.doc.angle }));
+            await mutateDoc(db(), videoId, "script écrit", (d) => ({ ...d, draft: script, sources }));
+          }
+          await setProgress(db(), videoId, { step: "Découpage en plans", done: 0, total: 1 });
+          return { beats: await splitScript(videoId, script), sources };
+        })()
+      : demoScript(row.doc.title, row.doc.artist);
+    beats = toBeats(rows);
+    await mutateDoc(db(), videoId, "script", (d) => ({ ...d, beats, sources, draft: null }));
+  }
 
-  // voice, three sentences at a time
+  // voice, three sentences at a time, only the lines that do not have theirs yet
+  const toVoice = beats.filter((b) => !b.voice || b.voiceText !== b.text);
   const voiceLimit = pLimit(3);
-  let voiced = 0;
+  let voiced = beats.length - toVoice.length;
+  await setProgress(db(), videoId, { step: "Voix off", done: voiced, total: beats.length });
   await Promise.all(
-    beats.map((b) =>
+    toVoice.map((b) =>
       voiceLimit(async () => {
         await voiceBeat(videoId, b.id, false);
         await setProgress(db(), videoId, { step: "Voix off", done: ++voiced, total: beats.length });
@@ -206,10 +221,13 @@ export async function generate(videoId: string) {
       groups.at(-1)!.push(b.id);
     } else groups.push([b.id]);
   });
+  // groups that already have images were done before a cut
+  const done = new Set((await load(videoId)).doc.beats.filter((b) => b.candidates.length).map((b) => b.id));
+  const todo = groups.filter((g) => !g.every((id) => done.has(id)));
   const imageLimit = pLimit(2);
-  let found = 0;
+  let found = groups.length - todo.length;
   await Promise.all(
-    groups.map((g) =>
+    todo.map((g) =>
       imageLimit(async () => {
         try {
           await imagesFor(videoId, g);
@@ -220,7 +238,7 @@ export async function generate(videoId: string) {
       }),
     ),
   );
-  await coverFor(videoId);
+  if (!(await load(videoId)).doc.cover) await coverFor(videoId);
   await setStatus(db(), videoId, "ready");
   await enqueue(JOBS.render, { videoId });
 }

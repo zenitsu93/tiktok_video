@@ -1,7 +1,7 @@
 "use client";
 
 import { ENTRANCE_LABELS, ENTRANCES, LAYOUT_LABELS, LAYOUTS, type BeatPatch } from "@regie/core";
-import { ArrowLeft, Download, Image as ImageIcon, Loader2, Mic, Pause, Play, Send, Sparkles, Undo2, Wand2 } from "lucide-react";
+import { ArrowLeft, Download, Image as ImageIcon, Loader2, Mic, Pause, Play, RotateCcw, Send, Sparkles, Undo2, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BeatView, VideoView } from "@/lib/view";
@@ -312,9 +312,20 @@ export function Fil({ initial }: { initial: VideoView }) {
             )
           )}
           {v.error && (
-            <p className="chip hot" role="alert" style={{ whiteSpace: "normal", alignSelf: "flex-start" }}>
-              {v.error}
-            </p>
+            <div className="chips" style={{ alignItems: "center" }}>
+              <p className="chip hot" role="alert" style={{ whiteSpace: "normal", margin: 0 }}>
+                {v.error}
+              </p>
+              {v.status === "error" && (
+                <button
+                  className="btn sm"
+                  title="Reprend là où ça s'est arrêté : ce qui est déjà fait n'est pas refait"
+                  onClick={() => run(() => call(`${url}/resume`, "POST").then(refresh), "Reprise lancée")}
+                >
+                  <RotateCcw size={14} /> Reprendre
+                </button>
+              )}
+            </div>
           )}
         </header>
 
