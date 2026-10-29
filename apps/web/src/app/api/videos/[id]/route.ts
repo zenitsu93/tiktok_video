@@ -1,4 +1,5 @@
 import { deleteVideo, getDb, getVideo } from "@regie/db";
+import { storage } from "@regie/server";
 import { NextResponse } from "next/server";
 import { HttpError, route, videoId } from "@/lib/http";
 import { videoView } from "@/lib/view";
@@ -12,6 +13,8 @@ export const GET = route(async (_req, { params }: Ctx) => {
 });
 
 export const DELETE = route(async (_req, { params }: Ctx) => {
-  await deleteVideo(getDb(), videoId((await params).id));
+  const files = await deleteVideo(getDb(), videoId((await params).id));
+  // the rows are already gone: a file that fails to go is only wasted space
+  await Promise.all(files.map((key) => storage().remove(key).catch(() => undefined)));
   return new NextResponse(null, { status: 204 });
 });

@@ -1,5 +1,5 @@
 import type { VideoDoc } from "@regie/core";
-import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import type { Db } from "./index";
 import { assets, sceneRenders, usage, videos, videoVersions, type Progress, type VideoStatus } from "./schema";
 
@@ -84,8 +84,41 @@ export async function setRendered(db: Db, id: string, renderAsset: string, scene
   await db.update(videos).set({ renderAsset, renderedScenes: scenes, updatedAt: new Date() }).where(eq(videos.id, id));
 }
 
-export async function deleteVideo(db: Db, id: string) {
-  await db.delete(videos).where(eq(videos.id, id));
+/**
+ * Deletes a video for good: its row and saved versions, then the files nothing points
+ * to any more (its images, voice clips and exports, the scene clips of its last export).
+ * Returns their storage keys for the caller to remove. Usage rows stay, so the spend
+ * history and the daily budget still count what this video cost.
+ */
+export async function deleteVideo(db: Db, id: string): Promise<string[]> {
+  return db.transaction(async (tx) => {
+    const [row] = await tx.select({ render: videos.renderAsset, scenes: videos.renderedScenes }).from(videos).where(eq(videos.id, id));
+    if (!row) return [];
+    const own = await tx.execute<{ id: string }>(sql`
+      select jsonb_object_keys(doc->'assets') as id from ${videos} where ${videos.id} = ${id}
+      union select jsonb_object_keys(doc->'assets') from ${videoVersions} where ${videoVersions.videoId} = ${id}`);
+    const ownIds = [...own.map((r) => r.id), ...(row.render ? [row.render] : [])];
+    await tx.delete(videos).where(eq(videos.id, id));
+
+    // anything a video, one of its versions or its last export still uses stays
+    const used = sql`(
+      select jsonb_object_keys(doc->'assets') from ${videos}
+      union select jsonb_object_keys(doc->'assets') from ${videoVersions}
+      union select render_asset from ${videos} where render_asset is not null)`;
+    // other orphans (older exports, leftovers) wait an hour, so a file being stored right now is never taken
+    const old = lt(assets.createdAt, sql`now() - interval '1 hour'`);
+    const files = await tx
+      .delete(assets)
+      .where(and(sql`${assets.id} not in ${used}`, ownIds.length ? or(inArray(assets.id, ownIds), old) : old))
+      .returning({ key: assets.storageKey });
+    const scenes = row.scenes.length
+      ? await tx
+          .delete(sceneRenders)
+          .where(and(inArray(sceneRenders.hash, row.scenes), sql`not exists (select 1 from ${videos} where ${videos.renderedScenes} ? ${sceneRenders.hash})`))
+          .returning({ key: sceneRenders.storageKey })
+      : [];
+    return [...files, ...scenes].map((f) => f.key);
+  });
 }
 
 // ---- assets and render cache
