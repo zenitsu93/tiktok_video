@@ -17,7 +17,7 @@ Ensuite je relis. Le script s'affiche phrase par phrase, et chaque phrase est un
 3. Apify va chercher des images sur Pinterest, Deezer donne la pochette.
 4. HyperFrames monte chaque plan en 1080×1920, en Kaneda Gothic, fond blanc. ffmpeg colle les plans et pose la voix.
 
-Kaneda Gothic n'est pas libre : ses fichiers ne sont pas dans le dépôt. Mets-les dans `brand/fonts/kaneda/` (voir le README de ce dossier). Sans eux, les vidéos sortent en Oswald. L'app, elle, reste en Oswald.
+Kaneda Gothic est dans le dépôt (`brand/fonts/kaneda/`, voir son README). Ce n'est pas une police libre : garde le dépôt privé. L'app, elle, reste en Oswald.
 
 Corriger un plan ne relance pas tout. Changer une image, un effet ou le mot en grand ne coûte rien : aucun appel à un modèle. Changer le texte refait la voix de cette phrase seulement. Une consigne à Claude (« @b08 une photo plus vieille ») n'envoie que la phrase et ses deux voisines, pas tout le script.
 
