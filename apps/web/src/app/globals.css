@@ -203,3 +203,10 @@ body.resizing iframe { pointer-events: none; }
   .lecture-page textarea { font-size: 18px; padding: 16px; min-height: 48vh; }
   .lecture-ask { flex-direction: column; }
 }
+
+/* full screen preview: the phone as tall as the screen, transport underneath */
+.stagebox { display: flex; flex-direction: column; gap: 10px; }
+.stagebox.full { position: fixed; inset: 0; z-index: 50; background: #0b0a09; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); justify-content: center; align-items: center; }
+.stagebox.full .phone { max-width: min(100%, calc((100dvh - 110px) * 9 / 16)); width: 100%; border-color: #000; }
+.stagebox.full .transport { width: min(100%, 520px); color: #f2eee7; }
+.stagebox.full .transport .btn { background: transparent; color: inherit; border-color: #3a3631; }

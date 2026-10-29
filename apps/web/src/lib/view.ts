@@ -12,6 +12,7 @@ export interface BeatView {
   image: string | null;
   candidates: string[];
   accent: boolean;
+  italic: boolean;
   reveal: "type" | "fade";
   gap: number;
   start: number;
@@ -85,6 +86,7 @@ export async function videoView(row: VideoRow): Promise<VideoView> {
       image: b.image,
       candidates: b.candidates,
       accent: b.accent,
+      italic: Boolean(b.italic),
       reveal: b.reveal,
       gap: b.gap,
       start: b.start,

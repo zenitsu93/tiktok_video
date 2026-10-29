@@ -1,7 +1,7 @@
 "use client";
 
 import { ENTRANCE_LABELS, ENTRANCES, LAYOUT_LABELS, LAYOUTS, type BeatPatch } from "@regie/core";
-import { ArrowLeft, Download, Image as ImageIcon, Loader2, Mic, Pause, Play, RotateCcw, Send, Sparkles, Undo2, Wand2 } from "lucide-react";
+import { ArrowLeft, Download, Image as ImageIcon, Loader2, Maximize2, Mic, Minimize2, Pause, Play, RotateCcw, Send, Sparkles, Undo2, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BeatView, VideoView } from "@/lib/view";
@@ -122,9 +122,14 @@ export function Fil({ initial }: { initial: VideoView }) {
     return () => clearInterval(id);
   }, [active, refresh]);
 
+  // open the first shot once, when the shots first appear; after that a closed shot stays closed
+  const opened = useRef(Boolean(initial.beats[0]));
   useEffect(() => {
-    if (!sel && v.beats[0]) setSel(v.beats[0].id);
-  }, [v.beats, sel]);
+    if (!opened.current && v.beats[0]) {
+      opened.current = true;
+      setSel(v.beats[0].id);
+    }
+  }, [v.beats]);
 
   const track = (id: string, kind: Job["kind"], query?: string) => setJobs((j) => ({ ...j, [id]: { kind, query, at: Date.now() } }));
   // forget a job once its line is free again (a few seconds of grace while it waits in the queue)
@@ -187,10 +192,39 @@ export function Fil({ initial }: { initial: VideoView }) {
     post({ type: "regie:seek", t: s });
   };
 
+  // a second click on the open shot closes it
   const choose = (b: BeatView) => {
+    if (sel === b.id) return setSel(null);
     setSel(b.id);
     seekTo(Math.min(b.end, b.start + 0.9));
   };
+
+  // full screen preview: the browser's own full screen where it exists, a dark overlay otherwise (iPhone)
+  const [full, setFull] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const toggleFull = async () => {
+    if (full) {
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+      setFull(false);
+      return;
+    }
+    setFull(true);
+    await stageRef.current?.requestFullscreen?.().catch(() => {});
+  };
+  useEffect(() => {
+    const onChange = () => {
+      if (!document.fullscreenElement) setFull(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFull(false);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
 
   async function run(fn: () => Promise<unknown>, ok?: string) {
     try {
@@ -225,7 +259,7 @@ export function Fil({ initial }: { initial: VideoView }) {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         const i = v.beats.findIndex((b) => b.id === sel);
         const n = v.beats[Math.max(0, Math.min(v.beats.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))];
-        if (n) {
+        if (n && n.id !== sel) {
           e.preventDefault();
           choose(n);
           document.getElementById(`beat-${n.id}`)?.scrollIntoView({ block: "nearest" });
@@ -400,28 +434,33 @@ export function Fil({ initial }: { initial: VideoView }) {
 
       <aside className="fil-side">
         <Divider width={side} onResize={resize} />
-        <div className="phone">
-          {frames.map((f, i) => (
-            <iframe
-              key={f.src}
-              ref={(el) => {
-                if (el) refs.current.set(f.src, el);
-                else refs.current.delete(f.src);
-              }}
-              src={f.src}
-              title="Aperçu de la vidéo"
-              sandbox="allow-scripts"
-              className={!f.ready ? "loading" : i < frames.length - 1 ? "stale" : undefined}
-              aria-hidden={i < frames.length - 1 || undefined}
-            />
-          ))}
-        </div>
-        <div className="transport">
-          <button className="btn sm" onClick={() => post({ type: playing ? "regie:pause" : "regie:play" })} aria-label={playing ? "Pause" : "Lecture"}>
-            {playing ? <Pause size={15} /> : <Play size={15} />}
-          </button>
-          <input type="range" min={0} max={Math.max(0.1, v.total)} step={0.05} value={Math.min(t, v.total)} onChange={(e) => seekTo(Number(e.target.value))} aria-label="Position" />
-          <span className="mono mute">{tc(t)}</span>
+        <div ref={stageRef} className={`stagebox${full ? " full" : ""}`}>
+          <div className="phone">
+            {frames.map((f, i) => (
+              <iframe
+                key={f.src}
+                ref={(el) => {
+                  if (el) refs.current.set(f.src, el);
+                  else refs.current.delete(f.src);
+                }}
+                src={f.src}
+                title="Aperçu de la vidéo"
+                sandbox="allow-scripts"
+                className={!f.ready ? "loading" : i < frames.length - 1 ? "stale" : undefined}
+                aria-hidden={i < frames.length - 1 || undefined}
+              />
+            ))}
+          </div>
+          <div className="transport">
+            <button className="btn sm" onClick={() => post({ type: playing ? "regie:pause" : "regie:play" })} aria-label={playing ? "Pause" : "Lecture"}>
+              {playing ? <Pause size={15} /> : <Play size={15} />}
+            </button>
+            <input type="range" min={0} max={Math.max(0.1, v.total)} step={0.05} value={Math.min(t, v.total)} onChange={(e) => seekTo(Number(e.target.value))} aria-label="Position" />
+            <span className="mono mute">{tc(t)}</span>
+            <button className="btn sm" onClick={toggleFull} aria-label={full ? "Quitter le plein écran" : "Plein écran"} title={full ? "Quitter le plein écran (Échap)" : "Plein écran"}>
+              {full ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+            </button>
+          </div>
         </div>
         <Costs v={v} />
       </aside>
@@ -438,13 +477,13 @@ export function Fil({ initial }: { initial: VideoView }) {
 }
 
 function Line({ b, accent }: { b: BeatView; accent: string | null }) {
-  if (!b.hero) return <>{b.text}</>;
+  if (!b.hero) return b.italic ? <i>{b.text}</i> : <>{b.text}</>;
   const i = b.text.toLowerCase().indexOf(b.hero.toLowerCase());
   if (i < 0) return <>{b.text}</>;
   return (
     <>
       {b.text.slice(0, i)}
-      <b style={b.accent && accent ? { color: accent } : undefined}>{b.text.slice(i, i + b.hero.length)}</b>
+      <b style={b.italic ? { fontStyle: "italic" } : b.accent && accent ? { color: accent } : undefined}>{b.text.slice(i, i + b.hero.length)}</b>
       {b.text.slice(i + b.hero.length)}
     </>
   );
@@ -619,6 +658,15 @@ function Inspector({
           </button>
           <button className="pick" aria-pressed={b.accent} onClick={() => patch({ accent: !b.accent })}>
             Couleur de l&apos;image sur le mot
+          </button>
+          <button
+            className="pick"
+            aria-pressed={b.italic}
+            onClick={() => patch({ italic: !b.italic })}
+            title="Pour un titre de chanson ou un mot d'aveu, environ une phrase sur cinq"
+            style={{ fontStyle: "italic" }}
+          >
+            Italique
           </button>
           <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14 }}>
             Pause après

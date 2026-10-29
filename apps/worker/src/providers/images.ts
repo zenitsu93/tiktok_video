@@ -91,12 +91,14 @@ export async function searchPinterest(videoId: string, query: string, limit: num
   return items.map((it) => pinUrls(it)[0]).filter((u): u is string => Boolean(u));
 }
 
-/** Album cover from Deezer's public API (no key), 1000 px. */
+/** Cover of the single or album from Deezer's public API (no key), 1000 px: exact track first, then a looser search. */
 export async function deezerCover(title: string, artist: string): Promise<string | null> {
-  const q = encodeURIComponent(`artist:"${artist}" track:"${title}"`);
-  const res = await fetch(`https://api.deezer.com/search?q=${q}&limit=1`, { signal: AbortSignal.timeout(15_000) });
-  if (!res.ok) return null;
-  const body = (await res.json()) as { data?: { album?: { cover_xl?: string } }[] };
-  const url = body.data?.[0]?.album?.cover_xl ?? null;
-  return url && allowedImageUrl(url) ? url : null;
+  for (const q of [`artist:"${artist}" track:"${title}"`, `${artist} ${title}`]) {
+    const res = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=1`, { signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) continue;
+    const body = (await res.json()) as { data?: { album?: { cover_xl?: string } }[] };
+    const url = body.data?.[0]?.album?.cover_xl ?? null;
+    if (url && allowedImageUrl(url)) return url;
+  }
+  return null;
 }
