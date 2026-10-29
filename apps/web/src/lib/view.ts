@@ -34,6 +34,8 @@ export interface VideoView {
   images: Record<string, { url: string; accent: string | null; w?: number; h?: number }>;
   cover: string | null;
   sources: string[];
+  /** The script waiting for approval, before it is cut into shots. */
+  draft: string | null;
   busy: string[];
   dirty: string[];
   download: string | null;
@@ -93,6 +95,7 @@ export async function videoView(row: VideoRow): Promise<VideoView> {
     images,
     cover: doc.cover,
     sources: doc.sources,
+    draft: doc.beats.length ? null : (doc.draft ?? null),
     busy: row.busyBeats,
     dirty: row.renderAsset && doc.beats.length ? dirtyBeats(doc, row.renderedScenes) : [],
     download: row.renderAsset ? `${signMedia(row.renderAsset, 6 * 3600)}&dl=${slug(`${row.artist}-${row.title}`)}` : null,

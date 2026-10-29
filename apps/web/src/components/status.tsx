@@ -1,5 +1,6 @@
 const LABELS = {
   draft: ["Brouillon", ""],
+  review: ["Script à valider", "warn"],
   generating: ["En préparation", "warn"],
   ready: ["Prête", "ok"],
   rendering: ["Montage", "warn"],

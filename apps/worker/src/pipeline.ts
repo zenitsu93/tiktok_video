@@ -6,7 +6,7 @@ import { join } from "node:path";
 import pLimit from "p-limit";
 import { ff, ingestImage, ingestVoice, storeFile, withTemp } from "./media";
 import { editBeat, splitScript, writeScript } from "./providers/claude";
-import { demoImages, demoScript, demoVoice } from "./providers/demo";
+import { demoImages, demoScript, demoSplit, demoVoice } from "./providers/demo";
 import { speak } from "./providers/elevenlabs";
 import { deezerCover, fetchImage, searchPinterest } from "./providers/images";
 import { exportVideo } from "./render";
@@ -181,18 +181,22 @@ export async function generate(videoId: string) {
 
   let beats = row.doc.beats;
   if (!beats.length) {
-    const { beats: rows, sources } = providers().claude
-      ? await (async () => {
-          let script = row.doc.draft ?? null;
-          let sources = row.doc.sources;
-          if (!script) {
-            ({ script, sources } = await writeScript(videoId, { title: row.doc.title, artist: row.doc.artist, angle: row.doc.angle }));
-            await mutateDoc(db(), videoId, "script écrit", (d) => ({ ...d, draft: script, sources }));
-          }
-          await setProgress(db(), videoId, { step: "Découpage en plans", done: 0, total: 1 });
-          return { beats: await splitScript(videoId, script), sources };
-        })()
-      : demoScript(row.doc.title, row.doc.artist);
+    const claude = providers().claude;
+    const demo = claude ? null : demoScript(row.doc.title, row.doc.artist);
+    let script = row.doc.draft ?? null;
+    let sources = row.doc.sources;
+    if (!script) {
+      if (claude) ({ script, sources } = await writeScript(videoId, { title: row.doc.title, artist: row.doc.artist, angle: row.doc.angle }));
+      else ({ script, sources } = { script: demo!.beats.map((b) => b.text).join(" "), sources: demo!.sources });
+      await mutateDoc(db(), videoId, "script écrit", (d) => ({ ...d, draft: script, sources }));
+    }
+    // nothing paid goes out until Thomas has read and approved the script
+    if (!row.doc.scriptOk) {
+      await setStatus(db(), videoId, "review", { step: "Script à valider", done: 0, total: 1 });
+      return;
+    }
+    await setProgress(db(), videoId, { step: "Découpage en plans", done: 0, total: 1 });
+    const rows = claude ? await splitScript(videoId, script) : script === demo!.beats.map((b) => b.text).join(" ") ? demo!.beats : demoSplit(script);
     beats = toBeats(rows);
     await mutateDoc(db(), videoId, "script", (d) => ({ ...d, beats, sources, draft: null }));
   }
@@ -241,6 +245,22 @@ export async function generate(videoId: string) {
   if (!(await load(videoId)).doc.cover) await coverFor(videoId);
   await setStatus(db(), videoId, "ready");
   await enqueue(JOBS.render, { videoId });
+}
+
+/** Rewrites the whole script from Thomas's instruction, before he approves it. */
+export async function reviseScript(videoId: string, instruction: string) {
+  if (!providers().claude) throw new Error("Ajoute ta clé Claude (ANTHROPIC_API_KEY) pour réécrire le script avec une consigne.");
+  const { doc } = await load(videoId);
+  if (!doc.draft || doc.beats.length) throw new Error("Il n'y a pas de script à valider sur cette vidéo.");
+  await setStatus(db(), videoId, "generating", { step: "Réécriture du script", done: 0, total: 1 });
+  try {
+    const { script, sources } = await writeScript(videoId, doc, { script: doc.draft, instruction });
+    await mutateDoc(db(), videoId, "script réécrit", (d) => ({ ...d, draft: script, sources: [...new Set([...d.sources, ...sources])].slice(0, 20) }));
+    await setStatus(db(), videoId, "review", { step: "Script à valider", done: 0, total: 1 });
+  } catch (e) {
+    // the current script stays as it was; Thomas can try again or approve it as is
+    await setStatus(db(), videoId, "review", { step: "Script à valider", done: 0, total: 1 }, `La réécriture a échoué : ${(e as Error).message}`);
+  }
 }
 
 // ---------------------------------------------------------------- one-beat edits

@@ -5,6 +5,7 @@ import { ArrowLeft, Download, Image as ImageIcon, Loader2, Mic, Pause, Play, Rot
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BeatView, VideoView } from "@/lib/view";
+import { Lecture } from "./lecture";
 import { StatusChip } from "./status";
 import { chime, Fan, Grooves, LineBusy, Platine, Sleeve, stageOf } from "./waits";
 
@@ -242,6 +243,21 @@ export function Fil({ initial }: { initial: VideoView }) {
   const voiceMissing = v.beats.some((b) => b.voiceStale);
   const canRender = v.beats.length > 0 && v.status !== "generating" && v.status !== "rendering";
   const upToDate = Boolean(v.download) && v.dirty.length === 0 && !voiceMissing;
+
+  // the script waits to be read and approved before anything paid is spent
+  const rewriting = v.status === "generating" && /réécriture/i.test(v.progress?.step ?? "");
+  if (v.draft !== null && (v.status === "review" || rewriting)) {
+    return (
+      <>
+        <Lecture v={v} rewriting={rewriting} send={(payload, ok) => run(() => call(`${url}/script`, "POST", payload).then(refresh), ok)} />
+        {toast && (
+          <div className={`toast${toast.err ? " err" : ""}`} role="status">
+            {toast.text}
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="fil" style={{ "--side": `${side}px` } as React.CSSProperties}>

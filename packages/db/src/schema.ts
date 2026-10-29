@@ -2,7 +2,7 @@ import type { VideoDoc } from "@regie/core";
 import { sql } from "drizzle-orm";
 import { bigint, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
-export type VideoStatus = "draft" | "generating" | "ready" | "rendering" | "error";
+export type VideoStatus = "draft" | "review" | "generating" | "ready" | "rendering" | "error";
 
 export interface Progress {
   step: string;
