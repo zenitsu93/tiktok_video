@@ -283,3 +283,21 @@ body.resizing iframe { pointer-events: none; }
 .launch .go .disc .lab::after { background: var(--accent); }
 .vlist .vrow { animation: rise .5s calc(var(--i, 0) * 60ms + 900ms) cubic-bezier(.22,1,.36,1) both; }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+
+/* "Envoyer sur TikTok": the button fills as the video travels */
+.tiktok-send { position: relative; overflow: hidden; }
+.tiktok-send .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: color-mix(in srgb, var(--paper) 22%, transparent); pointer-events: none; }
+.tiktok-send.sending .fill { animation: tt-fill 12s cubic-bezier(.2,.7,.3,1) forwards; }
+.tiktok-send.processing .fill { width: 70%; animation: tt-fill2 40s cubic-bezier(.2,.7,.3,1) forwards; }
+.tiktok-send.done .fill { width: 100%; }
+.tiktok-send:disabled { opacity: 1; }
+.tiktok-send:disabled:not(.sending):not(.processing):not(.done) { opacity: .45; }
+.tiktok-send .disc .lab { background: var(--paper); }
+@keyframes tt-fill { to { width: 70%; } }
+@keyframes tt-fill2 { to { width: 95%; } }
+
+/* public legal pages (asked for by the TikTok developer portal) */
+.legal { max-width: 680px; margin: 0 auto; padding: max(28px, env(safe-area-inset-top)) 18px 60px; display: flex; flex-direction: column; gap: 14px; font-size: 17px; }
+.legal h1 { font-size: clamp(38px, 9vw, 60px); font-weight: 600; } .legal h1 span { font-weight: 200; }
+.legal h2 { font-size: 22px; margin-top: 8px; }
+.legal p, .legal ul { margin: 0; }

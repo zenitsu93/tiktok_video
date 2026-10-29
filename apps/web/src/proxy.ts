@@ -6,7 +6,8 @@ import { readSession, SESSION_COOKIE } from "./lib/session";
  * gets a fresh nonce for its Content-Security-Policy. Route handlers check the
  * session again, so a mistake here does not open the data.
  */
-const PUBLIC = [/^\/login$/, /^\/auth\//, /^\/manifest\.webmanifest$/];
+// /legal and the tiktok*.txt signature file are what the TikTok developer portal checks
+const PUBLIC = [/^\/login$/, /^\/auth\//, /^\/manifest\.webmanifest$/, /^\/legal\/(conditions|confidentialite)$/, /^\/tiktok[A-Za-z0-9_-]*\.txt$/];
 
 export async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;

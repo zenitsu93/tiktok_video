@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { BeatView, VideoView } from "@/lib/view";
 import { DeleteVideo } from "./delete-video";
 import { Lecture } from "./lecture";
+import { TikTokSend, tiktokMoving } from "./tiktok-send";
 import { StatusChip } from "./status";
 import { chime, Fan, Grooves, LineBusy, Platine, Sleeve, stageOf } from "./waits";
 
@@ -116,8 +117,23 @@ export function Fil({ initial }: { initial: VideoView }) {
     } catch {}
   }, [url]);
 
+  // back from the TikTok sign-in: say how it went, then clean the address
+  useEffect(() => {
+    const r = new URLSearchParams(location.search).get("tiktok");
+    if (!r) return;
+    const said: Record<string, [string, boolean]> = {
+      ok: ["TikTok connecté. Tu peux envoyer la vidéo.", false],
+      scope: ["TikTok est connecté, mais sans le droit d'envoyer des vidéos. Reconnecte et coche l'envoi.", true],
+      refus: ["Connexion TikTok annulée.", true],
+      config: ["Ajoute TIKTOK_CLIENT_KEY et TIKTOK_CLIENT_SECRET sur le serveur.", true],
+    };
+    const [text, err] = said[r] ?? ["La connexion à TikTok a échoué. Réessaie.", true];
+    flash(text, err);
+    history.replaceState(null, "", location.pathname);
+  }, [flash]);
+
   // poll fast while something is moving, slowly otherwise
-  const active = v.status === "generating" || v.status === "rendering" || v.busy.length > 0 || Date.now() < eager;
+  const active = v.status === "generating" || v.status === "rendering" || v.busy.length > 0 || tiktokMoving(v) || Date.now() < eager;
   useEffect(() => {
     const id = setInterval(refresh, active ? 2000 : 15000);
     return () => clearInterval(id);
@@ -338,6 +354,14 @@ export function Fil({ initial }: { initial: VideoView }) {
                 <Download size={15} />
               </a>
             )}
+            <TikTokSend
+              v={v}
+              flash={flash}
+              onQueued={() => {
+                setEager(Date.now() + 15_000);
+                void refresh();
+              }}
+            />
             <DeleteVideo id={v.id} />
           </div>
           {firstRun ? (

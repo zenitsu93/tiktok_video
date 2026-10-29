@@ -1,6 +1,7 @@
 import { closeDb, getDb, setError, setProgress, setStatus } from "@regie/db";
 import { BudgetError, env, jobData, JOBS, providers, queue, retryLimit, type JobName } from "@regie/server";
 import { generate, moreImages, render, reviseScript, revoice, rewrite } from "./pipeline";
+import { sendToTikTok } from "./tiktok";
 
 /**
  * The worker runs every slow or paid step outside the web app: model calls,
@@ -46,6 +47,12 @@ await handle(JOBS.voice, 3, (d: { videoId: string; beatId: string }) => revoice(
 await handle(JOBS.images, 2, (d: { videoId: string; beatId: string; instruction?: string }) => moreImages(d.videoId, d.beatId, d.instruction));
 await handle(JOBS.rewrite, 2, (d: { videoId: string; beatId: string; instruction: string }) => rewrite(d.videoId, d.beatId, d.instruction));
 await handle(JOBS.render, 1, (d: { videoId: string }) => render(d.videoId), true);
+
+// the send records its own outcome on its line; it never marks the video as failed
+await boss.work(JOBS.tiktok, { localConcurrency: 1 }, async ([job]) => {
+  const d = jobData[JOBS.tiktok].parse(job!.data);
+  await sendToTikTok(d.videoId, d.sendId);
+});
 
 console.log("[worker] prêt");
 

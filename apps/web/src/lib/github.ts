@@ -8,6 +8,7 @@ export function github(): GitHub | null {
 }
 
 export const STATE_COOKIE = "regie_oauth_state";
+export const TIKTOK_STATE = "regie_tiktok_state";
 
 /** Only a relative path inside the app, so the login can never bounce to another site. */
 export function safeNext(next: string | null | undefined): string {
