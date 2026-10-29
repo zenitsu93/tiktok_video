@@ -55,7 +55,7 @@ Elles vont dans les variables d'environnement du serveur, et nulle part ailleurs
 
 Pour l'app OAuth GitHub, l'URL de callback est `https://ton-domaine/auth/github/callback`.
 
-À vérifier quand le token Apify sera là : les champs d'entrée de l'acteur Pinterest (`searchQueries`, `maxItems`) n'ont pas encore été testés contre le vrai service.
+L'acteur Pinterest reçoit `searchQueries` et `maxPins` (6 épingles par recherche). Sans `maxPins`, il en facture 50.
 
 ## Sécurité
 
