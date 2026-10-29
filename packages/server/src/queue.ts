@@ -18,6 +18,8 @@ export const JOBS = {
   render: "video-render",
   /** Send the last export to the owner's TikTok inbox. */
   tiktok: "tiktok-send",
+  /** Every night: delete the videos untouched for RETENTION_DAYS days. */
+  cleanup: "videos-cleanup",
 } as const;
 
 export const jobData = {
@@ -28,6 +30,7 @@ export const jobData = {
   [JOBS.rewrite]: z.object({ videoId: z.string().uuid(), beatId: z.string(), instruction: z.string().min(1).max(500) }),
   [JOBS.render]: z.object({ videoId: z.string().uuid() }),
   [JOBS.tiktok]: z.object({ videoId: z.string().uuid(), sendId: z.string().uuid() }),
+  [JOBS.cleanup]: z.object({}),
 };
 
 export type JobName = (typeof JOBS)[keyof typeof JOBS];

@@ -18,7 +18,7 @@ Pour revenir à une version : relancer le job d'un ancien commit (« Re-run jobs
 - `~/regie/.env` : les clés de l'app (droits 600). Le modèle est `.env.example`.
 - `~/regie/deploy/.env` : le mot de passe de Postgres, et `REGIE_TAG`, la version en ligne, que tient `deploy.sh`.
 - Trois conteneurs : `regie-web` (Next.js), `regie-worker` (Claude, voix, images, rendu) et `regie-db` (Postgres 16).
-- Deux volumes : `regie-pgdata` pour la base et `regie-media` pour les images, les voix et les MP4.
+- Deux volumes : `regie-pgdata` pour la base et `regie-media` pour les images, les voix et les MP4. Le worker supprime chaque nuit les vidéos qui n'ont pas bougé depuis 30 jours (`RETENTION_DAYS`), ce qui garde `regie-media` petit.
 - `~/caddy-sites/regie.caddy`, copié depuis `deploy/regie.caddy`. Le Caddy de 2nb-prospect sert le site en HTTPS et joint `regie-web` par le réseau `2nb-prospect_frontend`.
 
 Le VPS a 2 cœurs et 4 Go de mémoire, partagés avec les autres sites. Le worker rend donc un plan à la fois, avec un seul Chrome, et il est borné à 1,5 Go et 1,5 cœur. Un export prend plus de temps qu'en local, mais il ne gêne personne.

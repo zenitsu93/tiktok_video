@@ -1,5 +1,6 @@
 import { closeDb, getDb, setError, setProgress, setStatus } from "@regie/db";
 import { BudgetError, env, jobData, JOBS, providers, queue, retryLimit, type JobName } from "@regie/server";
+import { cleanup } from "./cleanup";
 import { generate, moreImages, render, reviseScript, revoice, rewrite } from "./pipeline";
 import { sendToTikTok } from "./tiktok";
 
@@ -53,6 +54,10 @@ await boss.work(JOBS.tiktok, { localConcurrency: 1 }, async ([job]) => {
   const d = jobData[JOBS.tiktok].parse(job!.data);
   await sendToTikTok(d.videoId, d.sendId);
 });
+
+// every night at 4:00 (UTC); a missed night is caught up by the next one
+await boss.schedule(JOBS.cleanup, "0 4 * * *");
+await boss.work(JOBS.cleanup, () => cleanup());
 
 console.log("[worker] prêt");
 
