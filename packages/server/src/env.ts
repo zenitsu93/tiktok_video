@@ -31,7 +31,7 @@ const schema = z.object({
 
   ELEVENLABS_API_KEY: optional,
   ELEVENLABS_VOICE_ID: z.string().default("AYfOkr1hDQYbhigmRZ16"),
-  ELEVENLABS_MODEL: z.string().default("eleven_multilingual_v2"),
+  ELEVENLABS_MODEL: z.string().default("eleven_v4"),
 
   APIFY_TOKEN: optional,
   APIFY_PINTEREST_ACTOR: z.string().default("automation-lab~pinterest-scraper"),

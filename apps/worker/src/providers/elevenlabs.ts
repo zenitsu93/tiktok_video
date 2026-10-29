@@ -2,6 +2,20 @@ import { getDb, recordUsage } from "@regie/db";
 import { assertBudget, env, PRICES } from "@regie/server";
 
 /**
+ * Model, language and delivery for every request. Forcing French keeps the English names
+ * and titles of a script from pulling the whole reading into English rules
+ * (multilingual_v2 takes no language code). Speed 1 and a steadier read were picked by
+ * ear against the voice's own settings (1.07 and 0.47).
+ */
+function voiceOptions(model: string) {
+  return {
+    model_id: model,
+    language_code: model === "eleven_multilingual_v2" ? undefined : "fr",
+    voice_settings: { stability: 0.6, similarity_boost: 0.75, style: 0, use_speaker_boost: true, speed: 1 },
+  };
+}
+
+/**
  * The whole script in one take, so the voice reads it in one go instead of restarting
  * every few words. The letter timings that come with it say where each beat sits.
  */
@@ -11,7 +25,7 @@ export async function speakTake(videoId: string, text: string): Promise<{ audio:
   const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(e.ELEVENLABS_VOICE_ID)}/with-timestamps?output_format=mp3_44100_128`, {
     method: "POST",
     headers: { "xi-api-key": e.ELEVENLABS_API_KEY!, "content-type": "application/json" },
-    body: JSON.stringify({ text, model_id: e.ELEVENLABS_MODEL }),
+    body: JSON.stringify({ text, ...voiceOptions(e.ELEVENLABS_MODEL) }),
     signal: AbortSignal.timeout(180_000),
   });
   if (!res.ok) {
@@ -48,7 +62,7 @@ export async function speak(videoId: string, text: string, around: { previous?: 
     headers: { "xi-api-key": e.ELEVENLABS_API_KEY!, "content-type": "application/json", accept: "audio/mpeg" },
     body: JSON.stringify({
       text,
-      model_id: e.ELEVENLABS_MODEL,
+      ...voiceOptions(e.ELEVENLABS_MODEL),
       previous_text: around.previous,
       next_text: around.next,
     }),
