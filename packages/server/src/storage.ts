@@ -1,7 +1,7 @@
-import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createReadStream, createWriteStream, existsSync } from "node:fs";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -22,6 +22,8 @@ export interface Storage {
   stream(key: string, range?: { start: number; end: number }): Promise<Readable>;
   /** A short-lived direct URL when the backend has one (S3), else null. */
   directUrl(key: string, seconds: number, filename?: string): Promise<string | null>;
+  /** Deletes a file; a missing one is not an error. */
+  remove(key: string): Promise<void>;
 }
 
 const KEY = /^[a-z0-9][a-z0-9/_.-]{0,200}$/;
@@ -75,6 +77,9 @@ class LocalStorage implements Storage {
   async directUrl() {
     return null;
   }
+  async remove(key: string) {
+    await rm(this.path(key), { force: true });
+  }
 }
 
 class S3Storage implements Storage {
@@ -117,6 +122,10 @@ class S3Storage implements Storage {
       new GetObjectCommand({ Bucket: this.bucket, Key: key, Range: range ? `bytes=${range.start}-${range.end}` : undefined }),
     );
     return r.Body as Readable;
+  }
+  async remove(key: string) {
+    checkKey(key);
+    await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
   }
   async directUrl(key: string, seconds: number, filename?: string) {
     checkKey(key);

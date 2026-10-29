@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { VideoView } from "@/lib/view";
+import { DeleteVideo } from "./delete-video";
 import { StatusChip } from "./status";
 import { Disc } from "./waits";
 
@@ -71,6 +72,8 @@ export function Lecture({
           <span className="chip mono" title="Durée estimée de la voix off">
             {n} mots · ~{secs} s
           </span>
+          <span style={{ marginLeft: "auto" }} />
+          <DeleteVideo id={v.id} />
         </div>
       </header>
 
@@ -125,7 +128,7 @@ export function Lecture({
 
       {v.sources.length > 0 && (
         <details className="panel">
-          <summary style={{ cursor: "pointer", fontWeight: 400 }}>Sources du script ({v.sources.length})</summary>
+          <summary>Sources du script ({v.sources.length})</summary>
           <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 13 }}>
             {v.sources.map((s) => (
               <li key={s} style={{ overflowWrap: "anywhere" }}>
