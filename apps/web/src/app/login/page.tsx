@@ -1,5 +1,5 @@
 import { env } from "@regie/server";
-import { safeNext } from "@/lib/github";
+import { github, safeNext } from "@/lib/github";
 
 const ERRORS: Record<string, string> = {
   owner: "Ce compte GitHub n'a pas accès à la Régie.",
@@ -14,6 +14,8 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
   const { e, next } = await searchParams;
   const cfg = env();
   const dev = cfg.DEV_LOGIN === "1" && cfg.NODE_ENV !== "production";
+  // the GitHub button only shows once its keys are set
+  const withGithub = Boolean(github());
   return (
     <main className="launch" style={{ minHeight: "100dvh", justifyContent: "center" }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -29,15 +31,22 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
           {ERRORS[e]}
         </p>
       )}
-      <a className="btn dark go" href={`/auth/github?next=${encodeURIComponent(safeNext(next))}`}>
-        Se connecter avec GitHub
-      </a>
+      {withGithub && (
+        <a className="btn dark go" href={`/auth/github?next=${encodeURIComponent(safeNext(next))}`}>
+          Se connecter avec GitHub
+        </a>
+      )}
       {dev && (
         <form action="/auth/dev" method="post">
-          <button className="btn" type="submit" style={{ width: "100%", justifyContent: "center" }}>
+          <button className={withGithub ? "btn" : "btn dark go"} type="submit" style={{ width: "100%", justifyContent: "center" }}>
             Entrer en local (DEV_LOGIN)
           </button>
         </form>
+      )}
+      {!withGithub && !dev && (
+        <p className="mute" style={{ margin: 0 }}>
+          Aucune connexion n'est configurée : mets DEV_LOGIN=1 dans .env en local, ou GITHUB_CLIENT_ID et GITHUB_CLIENT_SECRET.
+        </p>
       )}
     </main>
   );
