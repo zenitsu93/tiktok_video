@@ -13,10 +13,12 @@ Ensuite je relis. Le script s'affiche phrase par phrase, et chaque phrase est un
 ## Ce que ça fait
 
 1. Claude écrit l'histoire, avec recherche web et sources. Je la relis sur une page de lecture : je corrige à la main ou je demande une réécriture, puis je valide. Rien de payant (voix, images) ne part avant.
-2. Claude découpe le script validé en plans.
-3. ElevenLabs lit chaque phrase avec ma voix (voice id `AYfOkr1hDQYbhigmRZ16`).
+2. Claude découpe le script validé en plans, avec le rythme du skill de montage : à peu près un plan sans image sur quatre, une image tenue sur un à trois plans, quelques mots en italique pour varier.
+3. ElevenLabs lit tout le script d'une traite avec ma voix (voice id `AYfOkr1hDQYbhigmRZ16`). La prise est ensuite coupée dans les pauses, un morceau par plan, donc l'intonation ne repart pas à zéro tous les trois mots.
 4. Apify va chercher des images sur Pinterest, Deezer donne la pochette.
-5. HyperFrames monte chaque plan en 1080×1920, en Kaneda Gothic, fond blanc. ffmpeg colle les plans et pose la voix.
+5. HyperFrames monte chaque plan en 1080×1920, en Kaneda Gothic, fond blanc. La vidéo s'ouvre et se ferme sur la « Pochette » : le vinyle sort de la pochette de la chanson, avec le titre et l'artiste. ffmpeg colle les plans et pose la voix.
+
+Si la connexion lâche pendant une génération, la tâche réessaie toute seule. Si elle finit quand même en erreur, le bouton « Reprendre » repart de là où elle s'était arrêtée.
 
 Kaneda Gothic est dans le dépôt (`brand/fonts/kaneda/`, voir son README). Ce n'est pas une police libre : garde le dépôt privé. L'app, elle, reste en Oswald.
 
@@ -24,8 +26,12 @@ Corriger un plan ne relance pas tout. Changer une image, un effet ou le mot en g
 
 ## Les écrans
 
-- **Quelle chanson ?** : l'écran d'accueil, pensé pour le téléphone. Titre, artiste, un angle si j'en ai un, et c'est parti.
-- **Le Fil** : le script est l'interface. À gauche les phrases, à droite l'aperçu en direct dans un cadre de téléphone et ce que la vidéo a coûté. En bas, la barre de correction (touche `/`). Les flèches haut et bas passent d'une phrase à l'autre. « Annuler » revient à l'état d'avant, à chaque fois.
+- **Quelle chanson ?** : l'écran d'accueil, pensé pour le téléphone. Titre, artiste, un angle si j'en ai un, et c'est parti. Le titre s'écrit lettre par lettre comme dans les vidéos, et les champs vides proposent des exemples de chansons.
+- **Lecture** : le script en un seul texte, avant tout ce qui coûte. Je corrige, je demande une réécriture à Claude, puis « Valider le script ».
+- **Le Fil** : le script est l'interface. À gauche les phrases, à droite l'aperçu en direct dans un cadre de téléphone et ce que la vidéo a coûté. Un clic ouvre un plan, un deuxième clic le referme. Chaque plan peut passer en italique. L'aperçu passe en plein écran. En bas, la barre de correction (touche `/`). Les flèches haut et bas passent d'une phrase à l'autre. « Annuler » revient à l'état d'avant, à chaque fois.
+- **Conso** : ce que coûtent Claude, ElevenLabs et Apify sur 7, 14 ou 30 jours, par jour et par vidéo, face aux plafonds.
+
+Le bouton « Supprimer » (sur la vidéo, sur la page de lecture et sur chaque ligne de l'accueil) demande une confirmation. Il efface la vidéo, ses versions et les fichiers que plus rien n'utilise. L'historique des dépenses, lui, reste.
 
 ## Lancer en local
 
@@ -41,6 +47,8 @@ pnpm dev                    # l'app sur http://localhost:3000 et le worker
 Avec `DEV_LOGIN=1` dans `.env`, la page de connexion propose « Entrer en local ». Sans clés, chaque service tourne en mode démo : voix muette, images en dégradé, script d'exemple. Ça suffit pour essayer tout le parcours.
 
 Avec Docker : `docker compose up --build`.
+
+Sous Windows, si Postgres refuse le port 5432, mets `DB_PORT=55432` dans `.env` et le même port dans `DATABASE_URL`.
 
 ## Les clés
 
@@ -78,8 +86,11 @@ apps/worker      Claude, voix, images, rendu HyperFrames
 packages/core    le modèle d'une vidéo, le minutage et la composition HTML
 packages/db      Postgres (drizzle) : vidéos, versions, fichiers, coûts
 packages/server  configuration, stockage, liens signés, file de tâches, budget
-brand            logo, version animée, icônes, aperçus réseaux, police Oswald
+brand            logo, version animée, icônes, aperçus réseaux, polices Oswald et Kaneda
+skills           les skills d'écriture et de montage, et le module Pochette
 ```
+
+Le dossier `skills/` a son propre [README](skills/README.md). Il explique comment générer une Pochette sur ton PC avec `pochette.py`.
 
 ## La marque
 
@@ -89,6 +100,6 @@ Le logo s'appelle « Le Sillon » : THOMAS en Oswald, avec le O en vinyle. Tout 
 - `anime/` : la version animée (SVG, MP4, GIF) et la boucle.
 - `icones/` : favicons, icônes d'app, icône masquable.
 - `reseaux/` : les aperçus de lien (1200×630) et la cover GitHub.
-- `fonts/` : Oswald, sous licence SIL Open Font License.
+- `fonts/` : Oswald, sous licence SIL Open Font License, et Kaneda Gothic (commerciale, pour les vidéos seulement).
 
 `node brand/scripts/build-brand.mjs` régénère les PNG, le MP4 et le GIF.
