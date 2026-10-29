@@ -1,0 +1,7 @@
+public/vendor/
+public/*.png
+public/*.ico
+public/favicon.svg
+public/logo.svg
+next-env.d.ts
+*.tsbuildinfo

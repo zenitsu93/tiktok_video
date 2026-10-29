@@ -1,0 +1,104 @@
+import { timeBeats, voiceStale, type Beat, type Layout, type Entrance } from "@regie/core";
+import { getDb, videoCosts, type VideoRow } from "@regie/db";
+import { dirtyBeats, providers, signMedia } from "@regie/server";
+
+/** What the browser gets for one video: the script, timings, signed image links, costs. No secrets, no storage keys. */
+export interface BeatView {
+  id: string;
+  text: string;
+  hero: string;
+  layout: Layout;
+  entrance: Entrance;
+  image: string | null;
+  candidates: string[];
+  accent: boolean;
+  reveal: "type" | "fade";
+  gap: number;
+  start: number;
+  end: number;
+  voiceStale: boolean;
+  queries: string[];
+}
+
+export interface VideoView {
+  id: string;
+  title: string;
+  artist: string;
+  angle: string;
+  status: VideoRow["status"];
+  progress: VideoRow["progress"];
+  error: string | null;
+  version: number;
+  total: number;
+  beats: BeatView[];
+  images: Record<string, { url: string; accent: string | null; w?: number; h?: number }>;
+  cover: string | null;
+  sources: string[];
+  busy: string[];
+  dirty: string[];
+  download: string | null;
+  preview: string;
+  costs: { provider: string; operation: string; calls: number; cost: number }[];
+  spent: number;
+  providers: { claude: boolean; voice: boolean; images: boolean };
+}
+
+const slug = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60) || "video";
+
+export async function videoView(row: VideoRow): Promise<VideoView> {
+  const doc = row.doc;
+  const { beats, total } = doc.beats.length ? timeBeats(doc) : { beats: [], total: 0 };
+  const images: VideoView["images"] = {};
+  const want = new Set<string>();
+  doc.beats.forEach((b: Beat) => b.candidates.forEach((c) => want.add(c)));
+  if (doc.cover) want.add(doc.cover);
+  for (const id of want) {
+    const a = doc.assets[id];
+    if (a?.kind === "image") images[id] = { url: signMedia(id, 6 * 3600), accent: a.accent ?? null, w: a.width, h: a.height };
+  }
+  const costs = (await videoCosts(getDb(), row.id)).map((c) => ({ ...c, cost: Number(c.cost) }));
+  return {
+    id: row.id,
+    title: row.title,
+    artist: row.artist,
+    angle: doc.angle,
+    status: row.status,
+    progress: row.progress,
+    error: row.error,
+    version: row.version,
+    total,
+    beats: beats.map((b) => ({
+      id: b.id,
+      text: b.text,
+      hero: b.hero,
+      layout: b.layout,
+      entrance: b.entrance,
+      image: b.image,
+      candidates: b.candidates,
+      accent: b.accent,
+      reveal: b.reveal,
+      gap: b.gap,
+      start: b.start,
+      end: b.end,
+      voiceStale: voiceStale(b),
+      queries: b.imageQuery.queries,
+    })),
+    images,
+    cover: doc.cover,
+    sources: doc.sources,
+    busy: row.busyBeats,
+    dirty: row.renderAsset && doc.beats.length ? dirtyBeats(doc, row.renderedScenes) : [],
+    download: row.renderAsset ? `${signMedia(row.renderAsset, 6 * 3600)}&dl=${slug(`${row.artist}-${row.title}`)}` : null,
+    preview: `/api/videos/${row.id}/preview?v=${row.version}`,
+    costs,
+    spent: costs.reduce((s, c) => s + c.cost, 0),
+    providers: providers(),
+  };
+}
