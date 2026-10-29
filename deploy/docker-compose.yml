@@ -1,0 +1,89 @@
+# Régie sur le VPS OVH. Guide : deploy/README.md.
+# L'image vient de ghcr.io (construite par la CI) ; deploy/deploy.sh la tire et relance la pile.
+# Rien n'est publié sur un port : le Caddy de 2nb-prospect, seul sur les ports 80 et 443,
+# joint l'app par le réseau 2nb-prospect_frontend (site deploy/regie.caddy).
+#
+# deploy/.env (sur le serveur, jamais commité) donne POSTGRES_PASSWORD et REGIE_TAG ;
+# les clés de l'app sont dans le .env à la racine du dépôt.
+name: regie
+
+x-env: &env
+  DATABASE_URL: postgres://regie:${POSTGRES_PASSWORD:?}@db:5432/regie
+  STORAGE_DIR: /data
+
+x-app: &app
+  image: ghcr.io/zenitsu93/tiktok_video:${REGIE_TAG:?}
+  restart: unless-stopped
+  init: true
+  env_file: ../.env
+  volumes:
+    - media:/data
+  depends_on:
+    db:
+      condition: service_healthy
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: regie-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: regie
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: regie
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "regie", "-d", "regie"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  web:
+    <<: *app
+    container_name: regie-web
+    environment: *env
+    networks: [default, caddy]
+    mem_limit: 640m
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  worker:
+    <<: *app
+    container_name: regie-worker
+    command: ["pnpm", "--filter", "@regie/worker", "start"]
+    # Le VPS a 2 cœurs et peu de mémoire, partagés avec les autres sites :
+    # un seul Chrome de rendu à la fois, et le worker borné pour ne gêner personne.
+    environment:
+      <<: *env
+      RENDER_WORKERS: "1"
+      RENDER_SCENES_IN_PARALLEL: "1"
+    shm_size: 512m
+    mem_limit: 1536m
+    cpus: 1.5
+
+volumes:
+  pgdata:
+    name: regie-pgdata
+  media:
+    name: regie-media
+
+networks:
+  caddy:
+    external: true
+    name: 2nb-prospect_frontend

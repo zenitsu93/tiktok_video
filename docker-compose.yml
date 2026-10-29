@@ -1,4 +1,5 @@
 # Tout en local : Postgres, l'app et le worker. Les secrets viennent de .env (jamais commité).
+# La production (VPS) a son propre fichier : deploy/docker-compose.yml.
 services:
   db:
     image: postgres:16-alpine
@@ -9,7 +10,8 @@ services:
     volumes: [pgdata:/var/lib/postgresql/data]
     ports: ["127.0.0.1:${DB_PORT:-5432}:5432"]
   web:
-    build: { context: ., dockerfile: docker/Dockerfile.web }
+    build: { context: ., dockerfile: docker/Dockerfile }
+    image: regie:local
     env_file: .env
     environment:
       DATABASE_URL: postgres://regie:regie@db:5432/regie
@@ -18,13 +20,15 @@ services:
     ports: ["127.0.0.1:3000:3000"]
     depends_on: [db]
   worker:
-    build: { context: ., dockerfile: docker/Dockerfile.worker }
+    image: regie:local
+    command: ["pnpm", "--filter", "@regie/worker", "start"]
     env_file: .env
     environment:
       DATABASE_URL: postgres://regie:regie@db:5432/regie
       STORAGE_DIR: /data
     volumes: [media:/data]
-    depends_on: [db]
+    shm_size: 512m
+    depends_on: [db, web]
 volumes:
   pgdata:
   media:

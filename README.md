@@ -52,6 +52,10 @@ Avec Docker : `docker compose up --build`.
 
 Sous Windows, si Postgres refuse le port 5432, mets `DB_PORT=55432` dans `.env` et le même port dans `DATABASE_URL`.
 
+## En ligne
+
+Régie tourne sur mon VPS, à l'adresse https://regie.2nbdigital.com. Chaque fusion sur `main` passe les tests, publie l'image Docker sur ghcr.io et met le VPS à jour tout seul. Le détail est dans [deploy/README.md](deploy/README.md).
+
 ## Les clés
 
 Elles vont dans les variables d'environnement du serveur, et nulle part ailleurs. Jamais dans le code, jamais dans le navigateur.
@@ -93,6 +97,7 @@ packages/db      Postgres (drizzle) : vidéos, versions, fichiers, coûts
 packages/server  configuration, stockage, liens signés, file de tâches, budget
 brand            logo, version animée, icônes, aperçus réseaux, polices Oswald et Kaneda
 skills           les skills d'écriture et de montage, et le module Pochette
+deploy           la mise en ligne sur le VPS : docker compose, Caddy, script de déploiement
 ```
 
 Le dossier `skills/` a son propre [README](skills/README.md). Il explique comment générer une Pochette sur ton PC avec `pochette.py`.
