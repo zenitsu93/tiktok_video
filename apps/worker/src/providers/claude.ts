@@ -39,26 +39,34 @@ function checkStop(stop: string | null, what: string) {
   if (stop === "max_tokens") throw new Error(`La réponse de Claude pour ${what} a été coupée.`);
 }
 
-export async function writeScript(videoId: string, song: { title: string; artist: string; angle: string }) {
+/** Writes the script, or with `revise`, rewrites Thomas's current version following his instruction. */
+export async function writeScript(videoId: string, song: { title: string; artist: string; angle: string }, revise?: { script: string; instruction: string }) {
   await assertBudget(videoId);
   const ask = [
     `Chanson : « ${song.title} » de ${song.artist}.`,
     song.angle ? `Angle souhaité par Thomas : ${song.angle}.` : "Choisis l'anecdote la plus forte que tu peux vérifier.",
   ].join("\n");
+  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: ask }];
+  if (revise) {
+    messages.push(
+      { role: "assistant", content: revise.script },
+      { role: "user", content: `Consigne de Thomas : ${revise.instruction}\n\nRends le script complet corrigé (en gardant ce que la consigne ne touche pas), puis la ligne SOURCES:.` },
+    );
+  }
   const msg = await api()
     .beta.messages.stream({
       model: env().CLAUDE_MODEL,
       max_tokens: 32000,
       betas: BETAS,
       fallbacks: "default",
-      output_config: { effort: "high" },
+      output_config: { effort: revise ? "medium" : "high" },
       cache_control: { type: "ephemeral" },
       system: SCRIPT_SYSTEM,
-      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 6 }],
-      messages: [{ role: "user", content: ask }],
+      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: revise ? 3 : 6 }],
+      messages,
     })
     .finalMessage();
-  await logUsage(videoId, "script", msg.usage);
+  await logUsage(videoId, revise ? "script réécrit" : "script", msg.usage);
   checkStop(msg.stop_reason, "le script");
   const text = msg.content
     .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")

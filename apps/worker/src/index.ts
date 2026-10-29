@@ -1,6 +1,6 @@
 import { closeDb, getDb, setError, setProgress, setStatus } from "@regie/db";
 import { BudgetError, env, jobData, JOBS, providers, queue, retryLimit, type JobName } from "@regie/server";
-import { generate, moreImages, render, revoice, rewrite } from "./pipeline";
+import { generate, moreImages, render, reviseScript, revoice, rewrite } from "./pipeline";
 
 /**
  * The worker runs every slow or paid step outside the web app: model calls,
@@ -41,6 +41,7 @@ function handle<N extends JobName>(name: N, concurrency: number, fn: (data: neve
 }
 
 await handle(JOBS.generate, 1, (d: { videoId: string }) => generate(d.videoId), true);
+await handle(JOBS.script, 1, (d: { videoId: string; instruction: string }) => reviseScript(d.videoId, d.instruction));
 await handle(JOBS.voice, 3, (d: { videoId: string; beatId: string }) => revoice(d.videoId, d.beatId));
 await handle(JOBS.images, 2, (d: { videoId: string; beatId: string; instruction?: string }) => moreImages(d.videoId, d.beatId, d.instruction));
 await handle(JOBS.rewrite, 2, (d: { videoId: string; beatId: string; instruction: string }) => rewrite(d.videoId, d.beatId, d.instruction));

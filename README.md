@@ -12,10 +12,11 @@ Ensuite je relis. Le script s'affiche phrase par phrase, et chaque phrase est un
 
 ## Ce que ça fait
 
-1. Claude écrit l'histoire, avec recherche web et sources, puis la découpe en plans.
-2. ElevenLabs lit chaque phrase avec ma voix (voice id `AYfOkr1hDQYbhigmRZ16`).
-3. Apify va chercher des images sur Pinterest, Deezer donne la pochette.
-4. HyperFrames monte chaque plan en 1080×1920, en Kaneda Gothic, fond blanc. ffmpeg colle les plans et pose la voix.
+1. Claude écrit l'histoire, avec recherche web et sources. Je la relis sur une page de lecture : je corrige à la main ou je demande une réécriture, puis je valide. Rien de payant (voix, images) ne part avant.
+2. Claude découpe le script validé en plans.
+3. ElevenLabs lit chaque phrase avec ma voix (voice id `AYfOkr1hDQYbhigmRZ16`).
+4. Apify va chercher des images sur Pinterest, Deezer donne la pochette.
+5. HyperFrames monte chaque plan en 1080×1920, en Kaneda Gothic, fond blanc. ffmpeg colle les plans et pose la voix.
 
 Kaneda Gothic est dans le dépôt (`brand/fonts/kaneda/`, voir son README). Ce n'est pas une police libre : garde le dépôt privé. L'app, elle, reste en Oswald.
 

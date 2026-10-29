@@ -30,6 +30,16 @@ export function demoScript(title: string, artist: string): { beats: Omit<Beat, "
   };
 }
 
+/** Without Claude, an edited demo script is cut at its punctuation into plain text shots. */
+export function demoSplit(script: string): ReturnType<typeof demoScript>["beats"] {
+  return script
+    .split(/(?<=[.!?,;:])\s+/)
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .slice(0, 80)
+    .map((text) => ({ text, hero: "", layout: "text" as const, imageQuery: { kind: "none" as const, queries: [] } }));
+}
+
 /** A silent clip as long as the sentence would take to say. */
 export async function demoVoice(text: string): Promise<Buffer> {
   const seconds = Math.max(0.6, text.length / 15);
