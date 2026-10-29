@@ -91,6 +91,7 @@ const splitSchema = z.object({
         hero: z.string(),
         layout: z.enum(["card", "cutout", "text", "kinetic", "vinyl", "mascot"]),
         imageQuery: imageQuerySchema,
+        italic: z.boolean(),
       }),
     )
     .min(4)

@@ -78,6 +78,19 @@ describe("scenes", () => {
     expect(html).toContain("&lt;");
   });
 
+  it("writes timeline scripts that parse, with the cover on the vinyl intro and outro", () => {
+    const cover = { id: "cover", kind: "image" as const, mime: "image/jpeg", width: 1000, height: 1000 };
+    const d = { ...doc, cover: "cover", assets: { ...doc.assets, cover }, beats: doc.beats.map((b, i) => ({ ...b, italic: i % 5 === 1 })) };
+    const all = buildScenes(d).scenes;
+    for (const s of all) {
+      const html = sceneDocument(s, ctx(d), "assets", "kaneda");
+      const js = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join("\n");
+      expect(() => new Function("gsap", "CustomEase", "window", js)).not.toThrow();
+    }
+    expect(sceneDocument(all[0]!, ctx(d))).toContain('class="sleeve"');
+    expect(sceneDocument(all.at(-1)!, ctx(d))).toContain('class="sleeve"');
+  });
+
   it("builds a HyperFrames root for each scene", () => {
     const html = sceneDocument(scenes[5]!, ctx(doc));
     expect(html).toContain('data-composition-id="main"');

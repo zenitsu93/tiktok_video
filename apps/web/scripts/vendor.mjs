@@ -28,6 +28,11 @@ for (const w of WEIGHTS) {
   const src = useKaneda ? join(kdir, kaneda[w]) : join(brand, "fonts", `oswald-${w}.woff2`);
   cpSync(src, join(vendor, "fonts", `brand-${w}.font`));
 }
+// italics (Light and Black), Kaneda only: Oswald has none and the browser slants it
+for (const w of [300, 700]) {
+  const f = readdirSync(kdir).find((x) => /italic/i.test(x) && KANEDA[w].test(x));
+  if (useKaneda && f) cpSync(join(kdir, f), join(vendor, "fonts", `brand-${w}i.font`));
+}
 
 const icons = join(brand, "icones");
 for (const f of ["favicon.ico", "favicon.svg", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"]) cpSync(join(icons, f), join(pub, f));

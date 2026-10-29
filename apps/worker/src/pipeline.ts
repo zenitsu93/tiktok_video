@@ -145,13 +145,17 @@ async function coverFor(videoId: string) {
 
 // ---------------------------------------------------------------- full pipeline
 
-function toBeats(rows: { text: string; hero: string; layout: Beat["layout"]; imageQuery: Beat["imageQuery"] }[]): Beat[] {
+function toBeats(rows: { text: string; hero: string; layout: Beat["layout"]; imageQuery: Beat["imageQuery"]; italic?: boolean }[]): Beat[] {
   let r = 0;
+  let lastItalic = -9;
   return rows.map((row, i) => {
     const prev = rows[i - 1];
     const sameIdea = prev && prev.imageQuery.queries.join() === row.imageQuery.queries.join() && row.imageQuery.kind !== "none";
     const visual = row.layout === "card" || row.layout === "cutout";
     if (visual && !sameIdea) r = (r + 1) % ENTRANCES.length;
+    // italics stay rare: never two in a row, never on the subscribe lines
+    const italic = Boolean(row.italic) && row.layout !== "mascot" && i - lastItalic > 1;
+    if (italic) lastItalic = i;
     return {
       id: `b${String(i + 1).padStart(2, "0")}`,
       text: row.text.trim(),
@@ -166,6 +170,7 @@ function toBeats(rows: { text: string; hero: string; layout: Beat["layout"]; ima
       voice: null,
       voiceText: null,
       gap: /[.?!…]$/.test(row.text.trim()) ? 0.35 : 0.08,
+      italic,
     };
   });
 }

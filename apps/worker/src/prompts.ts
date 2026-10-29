@@ -40,6 +40,7 @@ Règles :
   - "kinetic" pour une phrase longue (8 mots ou plus) sans image ;
   - "cutout" pour un objet en dessin au trait sur fond blanc (guitare, micro, oreille, platine) ;
   - "card" pour tout le reste : une image dans une carte arrondie.
+- italic : true pour mettre le passage en italique, sinon false. Seulement pour un titre d'œuvre (chanson, album) ou un mot d'aveu ou d'émotion (« pour toujours », « effacer », « elle »). Environ un passage sur cinq, jamais deux passages de suite, jamais sur un passage "mascot". Le titre de la chanson dans l'accroche vinyle est toujours en italique.
 - imageQuery : pour "card" et "cutout", kind "pinterest" avec 2 recherches Pinterest en anglais, précises (nom + année + scène + aesthetic / painting / line art / png selon le rendu voulu). Deux passages consécutifs sur la même idée gardent exactement les mêmes recherches, pour garder la même image. Quand le passage nomme l'album ou la pochette, kind "cover" sans recherche. Sinon kind "none" sans recherche.`;
 
 export const EDIT_SYSTEM = `Tu corriges un seul passage d'une vidéo TikTok de Thomas (@thomasthbdl), à la demande de Thomas. Tu reçois le passage, ses voisins et la consigne.

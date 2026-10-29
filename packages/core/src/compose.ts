@@ -133,10 +133,24 @@ function entranceJs(sel: string, e: Entrance, t: number): string[] {
   }
 }
 
-type Run = { cls: "light" | "bold" | "hero" | "spoken" | "spokenb"; text: string };
+type Run = { cls: "light" | "bold" | "hero" | "spoken" | "spokenb"; text: string; it?: boolean };
 
 /** Splits a beat into styled runs around its hero word. */
 export function textRuns(beat: Beat, spoken: boolean): { rows: Run[][]; heroOffset: number } {
+  const out = plainRuns(beat, spoken);
+  if (!beat.italic) return out;
+  // one italic element per screen: the hero when there is one, otherwise the line, in Light Italic
+  const runs = out.rows.flat();
+  const hero = runs.find((r) => r.cls === "hero" || r.cls === "spokenb");
+  if (hero) hero.it = true;
+  else for (const r of runs) {
+    r.it = true;
+    if (r.cls === "bold") r.cls = "light";
+  }
+  return out;
+}
+
+function plainRuns(beat: Beat, spoken: boolean): { rows: Run[][]; heroOffset: number } {
   const text = beat.text.trim();
   const hero = beat.hero.trim();
   const at = hero ? text.toLowerCase().indexOf(hero.toLowerCase()) : -1;
@@ -223,14 +237,17 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
       js.push(`tl.to("#${sid} .inner",{scale:0,duration:0.15,ease:"inquick"},${t3(s0 + dur - 0.17)});`);
     }
   } else if (scene.kind === "vinyl") {
-    const label = scene.image && ctx.assets[scene.image] ? `<img src="${esc(ctx.src(scene.image))}" alt="">` : "";
+    const cover = scene.image && ctx.assets[scene.image] ? esc(ctx.src(scene.image)) : null;
+    const label = cover ? `<img src="${cover}" alt="">` : "";
+    const sleeve = cover ? `<div class="sleeve" style="left:${(W - 600) / 2}px;top:0"><img src="${cover}" alt=""></div>` : "";
     html.push(
       `<div id="${sid}" class="clip" data-start="${t3(s0)}" data-duration="${t3(dur)}" data-track-index="5">` +
-        `<div class="inner" style="left:${(W - 640) / 2}px;top:560px;width:640px;height:640px">` +
-        `<div class="disc"><div class="label">${label}</div></div></div></div>`,
+        `<div class="stage"><div class="inner" style="left:${(W - 600) / 2}px;top:0;width:600px;height:600px">` +
+        `<div class="disc"><div class="label">${label}</div></div></div>${sleeve}</div></div>`,
     );
-    js.push(...entranceJs(`#${sid} .inner`, "pop", s0));
     js.push(`tl.fromTo("#${sid} .disc",{rotation:0},{rotation:${Math.round(160 * dur)},duration:${t3(dur)},ease:"none"},${t3(s0)});`);
+    if (!cover) js.push(...entranceJs(`#${sid} .inner`, "pop", s0));
+    else js.push(...(scene.index === 0 ? sleeveIntroJs(sid, s0, dur) : sleeveOutroJs(sid, s0, dur)));
   } else if (scene.kind === "mascot") {
     html.push(
       `<div id="${sid}" class="clip" data-start="${t3(s0)}" data-duration="${t3(dur)}" data-track-index="5">` +
@@ -259,10 +276,13 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
     }
 
     const spoken = scene.kind === "mascot" || scene.kind === "vinyl";
-    const { rows } = textRuns(b, spoken);
+    const { rows } = textRuns(scene.kind === "vinyl" && k > 0 && b.hero ? { ...b, italic: true } : b, spoken);
     let pos: string;
     let blockCls = "block";
-    if (scene.kind === "vinyl") pos = k === 0 ? "top:300px" : "top:1260px";
+    if (scene.kind === "vinyl") {
+      pos = k === 0 ? "top:400px" : "top:1170px";
+      if (k > 0) blockCls += " title";
+    }
     else if (scene.kind === "mascot") pos = "top:880px";
     else if (textTop !== null) pos = `top:${textTop}px`;
     else pos = "top:0;bottom:0;align-items:center";
@@ -275,8 +295,9 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
         (row) =>
           `<div class="row">${row
             .map((r, ri) => {
-              const style = r.cls === "hero" || r.cls === "spokenb" ? ` style="color:${color}"` : "";
-              return `<span class="part ${r.cls} p${ri}"${style}>${chars(r.text)}</span>`;
+              // never italic and accent colour on the same word
+              const style = (r.cls === "hero" || r.cls === "spokenb") && !r.it ? ` style="color:${color}"` : "";
+              return `<span class="part ${r.cls}${r.it ? " it" : ""} p${ri}"${style}>${chars(r.text)}</span>`;
             })
             .join("")}</div>`,
       )
@@ -299,7 +320,7 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
       const partSel = `#${bid} .part.${r.cls}`;
       const dir = r.cls === "hero" ? dirHero : dirText;
       if (!spoken) js.push(`tl.fromTo("${partSel}",${DIR_FROM[dir]},{x:0,y:0,scale:1,opacity:1,duration:0.45,ease:"smooth"},${t3(tPart)});`);
-      const target = r.cls === "hero" || r.cls === "spokenb" ? color : INK;
+      const target = (r.cls === "hero" || r.cls === "spokenb") && !r.it ? color : INK;
       if (b.reveal === "fade") {
         js.push(`tl.fromTo("${partSel} .ch",{opacity:0},{opacity:1,duration:0.01},${t3(start)});`);
         js.push(`tl.fromTo("${partSel} .ch",{color:"${GREY}"},{color:"${target}",duration:0.15},${t3(tPart)});`);
@@ -317,6 +338,43 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
     }
   });
   return { html, js };
+}
+
+/**
+ * "Pochette" opening (skill-tiktok/pochette/SPEC.md): the cover comes out of a blur, the record
+ * slides out of it, then the cover flies off and the record takes the centre. A short hook shrinks the timings.
+ */
+function sleeveIntroJs(sid: string, s0: number, dur: number): string[] {
+  const f = Math.min(1, dur / 2.2);
+  const at = (t: number) => t3(s0 + t * f);
+  const d = (t: number) => t3(t * f);
+  return [
+    `tl.fromTo("#${sid} .sleeve",{scale:0.6,y:220,opacity:0,filter:"blur(24px)"},{scale:1,y:0,opacity:1,filter:"blur(0px)",duration:${d(0.75)},ease:"smooth"},${at(0)});`,
+    `tl.fromTo("#${sid} .inner",{opacity:0},{opacity:1,duration:0.01},${at(0.5)});`,
+    `tl.to("#${sid} .inner",{x:220,duration:${d(0.8)},ease:"smooth"},${at(0.55)});`,
+    `tl.to("#${sid} .sleeve",{x:-220,rotation:-4,duration:${d(0.8)},ease:"smooth"},${at(0.55)});`,
+    `tl.to("#${sid} .sleeve",{x:-1000,rotation:-16,opacity:0,duration:${d(0.6)},ease:"inquick"},${at(1.35)});`,
+    `tl.to("#${sid} .inner",{x:0,duration:${d(0.7)},ease:"inout"},${at(1.35)});`,
+  ];
+}
+
+/** "Pochette" ending: the cover comes back, the record slides into it, then everything shrinks to a dot. */
+function sleeveOutroJs(sid: string, s0: number, dur: number): string[] {
+  const g = Math.min(1.55, dur * 0.6) / 1.55;
+  const e = s0 + dur;
+  const at = (t: number) => t3(Math.max(s0, e - t * g));
+  const d = (t: number) => t3(t * g);
+  return [
+    `tl.fromTo("#${sid} .stage",{scale:0},{scale:1.06,duration:0.3,ease:"back.out(1.6)"},${t3(s0)});`,
+    `tl.to("#${sid} .stage",{scale:1,duration:0.18,ease:"smooth"},${t3(s0 + 0.3)});`,
+    `tl.set("#${sid} .sleeve",{opacity:0},${t3(s0)});`,
+    `tl.to("[id^='${sid}b'] .tinner",{y:-40,opacity:0,filter:"blur(10px)",duration:${d(0.4)},ease:"inquick"},${at(1.55)});`,
+    `tl.fromTo("#${sid} .sleeve",{x:-1000,rotation:-16,opacity:0},{x:-220,rotation:-4,opacity:1,duration:${d(0.5)},ease:"smooth"},${at(1.55)});`,
+    `tl.to("#${sid} .inner",{x:220,duration:${d(0.45)},ease:"inout"},${at(1.55)});`,
+    `tl.to("#${sid} .inner",{x:0,duration:${d(0.42)},ease:"inquick"},${at(1)});`,
+    `tl.to("#${sid} .sleeve",{x:0,rotation:0,duration:${d(0.42)},ease:"inquick"},${at(1)});`,
+    `tl.to("#${sid} .stage",{scale:0,duration:${d(0.3)},ease:"inquick"},${at(0.45)});`,
+  ];
 }
 
 function kineticLines(text: string): string[] {
@@ -343,8 +401,9 @@ function kineticHtml(bid: string, b: Beat, start: number, dur: number, k: number
     .map((l, i) => {
       // every line has the same width, so the font size follows the line length
       const size = Math.max(60, Math.min(200, Math.round(820 / (l.length * 0.43))));
-      const weight = hero && l.toLowerCase().includes(hero) ? 700 : i % 2 === 0 ? 300 : 700;
-      return `<div class="kline" style="font-size:${size}px;font-weight:${weight}">${chars(l)}</div>`;
+      const it = b.italic && i === lines.length - 1;
+      const weight = it ? 300 : hero && l.toLowerCase().includes(hero) ? 700 : i % 2 === 0 ? 300 : 700;
+      return `<div class="kline${it ? " it" : ""}" style="font-size:${size}px;font-weight:${weight}">${chars(l)}</div>`;
     })
     .join("");
   return (
@@ -371,6 +430,8 @@ const MASCOT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 220
 
 /** Weights the layouts use; each brand font provides one file per weight (see brandFonts in @regie/server). */
 export const FONT_WEIGHTS = [200, 300, 400, 600, 700] as const;
+/** Italic weights (Light and Black); Kaneda only, Oswald falls back to a slanted roman. */
+export const ITALIC_WEIGHTS = [300, 700] as const;
 /** Kaneda Gothic when its files are installed locally, Oswald otherwise. */
 export type FontName = "kaneda" | "oswald";
 
@@ -389,7 +450,10 @@ function documentHtml(parts: Parts, o: DocumentOptions): string {
   const v = o.vendorBase.replace(/\/$/, "");
   const fonts =
     `/* font: ${o.font ?? "oswald"} */\n` +
-    FONT_WEIGHTS.map((w) => `@font-face{font-family:"Brand";font-weight:${w};font-display:block;src:url("${v}/fonts/brand-${w}.font")}`).join("\n");
+    FONT_WEIGHTS.map((w) => `@font-face{font-family:"Brand";font-weight:${w};font-display:block;src:url("${v}/fonts/brand-${w}.font")}`).join("\n") +
+    (o.font === "kaneda"
+      ? "\n" + ITALIC_WEIGHTS.map((w) => `@font-face{font-family:"Brand";font-style:italic;font-weight:${w};font-display:block;src:url("${v}/fonts/brand-${w}i.font")}`).join("\n")
+      : "");
   const audio = o.audio
     ? `<audio id="vo" src="${esc(o.audio)}" data-start="0" data-duration="${t3(o.duration)}" data-track-index="0"></audio>`
     : "";
@@ -411,6 +475,9 @@ html, body { width:${W}px; height:${H}px; overflow:hidden; background:#ffffff; }
 .card img { width:100%; height:100%; object-fit:cover; display:block; }
 .cut img { width:100%; height:100%; object-fit:contain; display:block; }
 .disc { width:100%; height:100%; border-radius:50%; background:repeating-radial-gradient(circle,#151515 0 6px,#232323 6px 8px); display:flex; align-items:center; justify-content:center; }
+.stage { position:absolute; left:0; top:520px; width:${W}px; height:600px; transform-origin:50% 50%; }
+.sleeve { position:absolute; width:600px; height:600px; border-radius:18px; overflow:hidden; box-shadow:0 30px 60px rgba(0,0,0,.18); transform-origin:50% 50%; }
+.sleeve img { width:100%; height:100%; object-fit:cover; display:block; }
 .label { width:38%; height:38%; border-radius:50%; overflow:hidden; background:#d6381c; }
 .label img { width:100%; height:100%; object-fit:cover; display:block; }
 .tinner { position:absolute; left:0; width:${W}px; display:flex; justify-content:center; }
@@ -424,9 +491,11 @@ html, body { width:${W}px; height:${H}px; overflow:hidden; background:#ffffff; }
 .hero { font-weight:700; font-size:190px; line-height:.86; }
 .spoken { font-weight:400; font-size:68px; line-height:1.05; }
 .spokenb { font-weight:700; font-size:68px; line-height:1.05; }
+.title .spoken, .title .spokenb { font-size:104px; line-height:1; }
 .kinetic { align-items:center; gap:0; }
 .kline { line-height:.95; white-space:nowrap; }
 .w { display:inline-block; white-space:nowrap; }
+.it { font-style:italic; }
 </style>
 ${o.extraHead ?? ""}
 </head>

@@ -85,6 +85,8 @@ export const beatSchema = z.object({
   voiceText: z.string().nullable(),
   /** Silence after the clip, in seconds. */
   gap: z.number().min(0).max(3),
+  /** Italic accent: a work title or a word of confession (hero in Black Italic, else the line in Light Italic). */
+  italic: z.boolean().optional(),
 });
 export type Beat = z.infer<typeof beatSchema>;
 
@@ -118,6 +120,7 @@ export const beatPatchSchema = z
     accent: z.boolean(),
     reveal: z.enum(["type", "fade"]),
     gap: z.number().min(0).max(3),
+    italic: z.boolean(),
   })
   .partial()
   .strict();

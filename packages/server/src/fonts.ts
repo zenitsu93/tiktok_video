@@ -1,4 +1,4 @@
-import { FONT_WEIGHTS, type FontName } from "@regie/core";
+import { FONT_WEIGHTS, ITALIC_WEIGHTS, type FontName } from "@regie/core";
 import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -17,8 +17,8 @@ const KANEDA: Record<(typeof FONT_WEIGHTS)[number], RegExp> = {
 
 export interface BrandFonts {
   name: FontName;
-  /** Absolute path of the file for each weight. */
-  files: Record<number, string>;
+  /** Absolute path of the file for each weight ("300i" and "700i" for the italics). */
+  files: Record<string, string>;
 }
 
 export function fontsDir(): string {
@@ -30,17 +30,23 @@ let cached: BrandFonts | undefined;
 export function brandFonts(dir = fontsDir()): BrandFonts {
   if (cached && dir === fontsDir()) return cached;
   const kdir = join(dir, "kaneda");
-  const found: Record<number, string> = {};
+  const found: Record<string, string> = {};
+  const italics: Record<string, string> = {};
   if (existsSync(kdir)) {
-    const files = readdirSync(kdir).filter((f) => /\.(otf|ttf|woff2?)$/i.test(f) && !/italic/i.test(f));
+    const all = readdirSync(kdir).filter((f) => /\.(otf|ttf|woff2?)$/i.test(f));
+    const files = all.filter((f) => !/italic/i.test(f));
     for (const w of FONT_WEIGHTS) {
       const f = files.find((x) => KANEDA[w].test(x));
       if (f) found[w] = join(kdir, f);
     }
+    for (const w of ITALIC_WEIGHTS) {
+      const f = all.find((x) => /italic/i.test(x) && KANEDA[w].test(x));
+      if (f) italics[`${w}i`] = join(kdir, f);
+    }
   }
   const result: BrandFonts =
     Object.keys(found).length === FONT_WEIGHTS.length
-      ? { name: "kaneda", files: found }
+      ? { name: "kaneda", files: { ...found, ...italics } }
       : { name: "oswald", files: Object.fromEntries(FONT_WEIGHTS.map((w) => [w, join(dir, `oswald-${w}.woff2`)])) };
   if (dir === fontsDir()) cached = result;
   return result;
