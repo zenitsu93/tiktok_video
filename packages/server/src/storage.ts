@@ -1,6 +1,6 @@
 import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { createReadStream, createWriteStream } from "node:fs";
+import { createReadStream, createWriteStream, existsSync } from "node:fs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
@@ -29,10 +29,18 @@ function checkKey(key: string) {
   if (!KEY.test(key) || key.includes("..")) throw new Error(`invalid storage key: ${key}`);
 }
 
+/** The web app and the worker run from different folders; a relative STORAGE_DIR starts at the repository root for both. */
+function workspaceRoot(): string {
+  for (let dir = process.cwd(); ; dir = dirname(dir)) {
+    if (existsSync(join(dir, "pnpm-workspace.yaml"))) return dir;
+    if (dirname(dir) === dir) return process.cwd();
+  }
+}
+
 class LocalStorage implements Storage {
   private root: string;
   constructor(dir: string) {
-    this.root = resolve(dir);
+    this.root = resolve(workspaceRoot(), dir);
   }
   private path(key: string) {
     checkKey(key);
