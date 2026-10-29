@@ -9,3 +9,7 @@ coverage/
 data/
 renders/
 .DS_Store
+
+# commercial font files, each person brings their own
+brand/fonts/kaneda/*
+!brand/fonts/kaneda/README.md

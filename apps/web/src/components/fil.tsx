@@ -10,6 +10,50 @@ import { chime, Fan, Grooves, LineBusy, Platine, Sleeve, stageOf } from "./waits
 
 type Job = { kind: "images" | "voice" | "rewrite"; query?: string; at: number };
 
+const SIDE_DEFAULT = 360;
+const clampSide = (w: number) => Math.round(Math.min(Math.max(w, 260), Math.max(260, Math.min(900, (typeof window === "undefined" ? 1400 : window.innerWidth) - 420))));
+
+/** The bar between the script and the preview: drag it, use the arrow keys, double-click to reset. */
+function Divider({ width, onResize }: { width: number; onResize: (w: number) => void }) {
+  const start = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const x0 = e.clientX;
+    const w0 = width;
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    document.body.classList.add("resizing");
+    const move = (ev: PointerEvent) => onResize(w0 + (x0 - ev.clientX));
+    const up = () => {
+      document.body.classList.remove("resizing");
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", up);
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+  };
+  return (
+    <div
+      className="divider"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Largeur de l'aperçu"
+      aria-valuenow={width}
+      aria-valuemin={260}
+      aria-valuemax={900}
+      tabIndex={0}
+      title="Glisse pour agrandir ou réduire l'aperçu (double-clic : taille normale)"
+      onPointerDown={start}
+      onDoubleClick={() => onResize(SIDE_DEFAULT)}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowLeft") onResize(width + 20);
+        if (e.key === "ArrowRight") onResize(width - 20);
+      }}
+    />
+  );
+}
+
 const tc = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 const usd = (n: number) => `${n.toFixed(n < 1 ? 3 : 2)} $`;
 
@@ -37,6 +81,20 @@ export function Fil({ initial }: { initial: VideoView }) {
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [jobs, setJobs] = useState<Record<string, Job>>({});
+  const [side, setSide] = useState(SIDE_DEFAULT);
+  useEffect(() => {
+    try {
+      const w = Number(localStorage.getItem("regie:side"));
+      if (w) setSide(clampSide(w));
+    } catch {}
+  }, []);
+  const resize = (w: number) => {
+    const c = clampSide(w);
+    setSide(c);
+    try {
+      localStorage.setItem("regie:side", String(c));
+    } catch {}
+  };
   const [done, setDone] = useState(false);
   // the preview: the previous frame stays, blurred, until the new one is ready
   const [frames, setFrames] = useState<{ src: string; ready: boolean }[]>([{ src: initial.preview, ready: false }]);
@@ -186,7 +244,7 @@ export function Fil({ initial }: { initial: VideoView }) {
   const upToDate = Boolean(v.download) && v.dirty.length === 0 && !voiceMissing;
 
   return (
-    <div className="fil">
+    <div className="fil" style={{ "--side": `${side}px` } as React.CSSProperties}>
       <main className="fil-main">
         <header className="fil-head">
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -314,6 +372,7 @@ export function Fil({ initial }: { initial: VideoView }) {
       </main>
 
       <aside className="fil-side">
+        <Divider width={side} onResize={resize} />
         <div className="phone">
           {frames.map((f, i) => (
             <iframe

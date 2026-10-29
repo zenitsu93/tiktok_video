@@ -1,6 +1,6 @@
 import { previewDocument } from "@regie/core";
 import { getDb, getVideo } from "@regie/db";
-import { env, signMedia } from "@regie/server";
+import { brandFonts, env, signMedia } from "@regie/server";
 import { HttpError, route, videoId } from "@/lib/http";
 import { PREVIEW_SHIM } from "@/lib/preview-shim";
 
@@ -20,6 +20,7 @@ export const GET = route(async (req, { params }: Ctx) => {
     { assets: doc.assets, src: (id) => (doc.assets[id] ? signMedia(id, 6 * 3600) : "") },
     {
       vendorBase: "/vendor",
+      font: brandFonts().name,
       audio: doc.voiceTrack ? signMedia(doc.voiceTrack, 6 * 3600) : undefined,
       extraHead: `<style>.clip{visibility:hidden}</style>`,
       extraBody: `<script>${PREVIEW_SHIM}</script>`,
