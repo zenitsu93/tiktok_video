@@ -1,4 +1,4 @@
-import type { Asset } from "@regie/core";
+import { FPS, type Asset } from "@regie/core";
 import { getDb, saveAsset } from "@regie/db";
 import { storage } from "@regie/server";
 import { execFile } from "node:child_process";
@@ -84,13 +84,40 @@ export async function ingestVoice(input: Buffer, source: string, trim = true): P
     await encode(trim ? ["-af", TRIM] : []);
     // a clip that is all silence would trim to nothing: keep it whole
     if (trim && !(await audioDuration(out).catch(() => 0))) await encode([]);
-    const body = await readFile(out);
-    const id = idOf("a", body);
-    const key = `assets/${id}.m4a`;
-    if (!(await storage().exists(key))) await storage().put(key, body, "audio/mp4");
-    await saveAsset(getDb(), { id, kind: "audio", mime: "audio/mp4", size: body.length, storageKey: key, source });
-    return { id, kind: "audio", mime: "audio/mp4", duration: await audioDuration(out), source };
+    return saveVoice(await readFile(out), source, await audioDuration(out));
   });
+}
+
+/**
+ * Cuts one take into a clip per beat at the given frames. The take is decoded once and
+ * cut by sample, with no silence removed, so the clips played end to end are the take.
+ * Clips are lossless (FLAC): a lossy clip that starts mid-word smears its edges, and
+ * only the mixed track, encoded once, ever reaches a browser.
+ */
+export async function sliceTake(input: Buffer, cuts: number[], source: string): Promise<Asset[]> {
+  return withTemp(async (dir) => {
+    const src = join(dir, "take.mp3");
+    const wav = join(dir, "take.wav");
+    await writeFile(src, input);
+    await ff("ffmpeg", ["-y", "-loglevel", "error", "-i", src, "-ac", "1", "-ar", "44100", wav]);
+    const perFrame = 44100 / FPS;
+    const clips: Asset[] = [];
+    for (let k = 0; k + 1 < cuts.length; k++) {
+      const out = join(dir, `${k}.flac`);
+      const trim = `atrim=start_sample=${cuts[k]! * perFrame}:end_sample=${cuts[k + 1]! * perFrame},asetpts=N/SR/TB`;
+      await ff("ffmpeg", ["-y", "-loglevel", "error", "-i", wav, "-af", trim, "-c:a", "flac", out]);
+      clips.push(await saveVoice(await readFile(out), source, (cuts[k + 1]! - cuts[k]!) / FPS, "flac", "audio/flac"));
+    }
+    return clips;
+  });
+}
+
+async function saveVoice(body: Buffer, source: string, duration: number, ext = "m4a", mime = "audio/mp4"): Promise<Asset> {
+  const id = idOf("a", body);
+  const key = `assets/${id}.${ext}`;
+  if (!(await storage().exists(key))) await storage().put(key, body, mime);
+  await saveAsset(getDb(), { id, kind: "audio", mime, size: body.length, storageKey: key, source });
+  return { id, kind: "audio", mime, duration, source };
 }
 
 export async function storeFile(prefix: string, body: Buffer, mime: string, ext: string, kind: Asset["kind"], source: string): Promise<Asset> {

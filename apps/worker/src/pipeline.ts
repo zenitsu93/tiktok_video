@@ -1,13 +1,14 @@
-import { applyBeatPatch, beatContext, ENTRANCES, timeBeats, type Asset, type Beat, type VideoDoc } from "@regie/core";
+import { applyBeatPatch, beatContext, FPS, timeBeats, type Asset, type Beat, type VideoDoc } from "@regie/core";
 import { getAsset, getDb, getVideo, mutateDoc, setBusy, setProgress, setRendered, setStatus } from "@regie/db";
 import { enqueue, JOBS, providers, storage } from "@regie/server";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import pLimit from "p-limit";
-import { ff, ingestImage, ingestVoice, storeFile, withTemp } from "./media";
+import { takeCuts, toBeats } from "./beats";
+import { ff, ingestImage, ingestVoice, sliceTake, storeFile, withTemp } from "./media";
 import { editBeat, splitScript, writeScript } from "./providers/claude";
 import { demoImages, demoScript, demoSplit, demoVoice } from "./providers/demo";
-import { speak } from "./providers/elevenlabs";
+import { speak, speakTake } from "./providers/elevenlabs";
 import { deezerCover, fetchImage, searchPinterest } from "./providers/images";
 import { exportVideo } from "./render";
 
@@ -50,6 +51,28 @@ export async function voiceBeat(videoId: string, beatId: string, remix = true) {
   if (remix) await remixVoice(videoId);
 }
 
+/**
+ * Voices every beat from one take of the whole script: the reading flows instead of
+ * restarting every few words, and each beat still gets its own clip to redo alone.
+ */
+async function voiceTake(videoId: string) {
+  const { doc } = await load(videoId);
+  const texts = doc.beats.map((b) => b.text);
+  const take = await speakTake(videoId, texts.join(" "));
+  const cuts = takeCuts(texts, take.starts, take.ends, take.ends.at(-1)! + 0.5);
+  const clips = await sliceTake(take.audio, cuts, "elevenlabs");
+  const ids = doc.beats.map((b) => b.id);
+  await mutateDoc(db(), videoId, "voix", (d) => ({
+    ...d,
+    assets: { ...d.assets, ...Object.fromEntries(clips.map((c) => [c.id, c])) },
+    // the pauses are already in the take, so the beats sit end to end
+    beats: d.beats.map((b) => {
+      const k = ids.indexOf(b.id);
+      return k >= 0 && b.text === texts[k] ? { ...b, voice: clips[k]!.id, voiceText: b.text, gap: 0 } : b;
+    }),
+  }));
+}
+
 /** Mixes every clip at its beat's frame, for the preview and the export. Takes a second or two. */
 export async function remixVoice(videoId: string) {
   const { doc } = await load(videoId);
@@ -61,11 +84,12 @@ export async function remixVoice(videoId: string) {
     for (const [k, b] of beats.entries()) {
       const row = await getAsset(db(), b.voice!);
       if (!row) throw new Error(`clip ${b.voice} introuvable`);
-      const file = join(dir, `${k}.m4a`);
+      const file = join(dir, `${k}${extname(row.storageKey)}`);
       await storage().download(row.storageKey, file);
       inputs.push("-i", file);
-      const ms = Math.round((b.startFrame / 30) * 1000);
-      filters.push(`[${k}:a]adelay=${ms}|${ms}[d${k}]`);
+      // in samples (clips are 44.1 kHz), so clips cut from one take meet without a gap or an overlap
+      const at = b.startFrame * (44100 / FPS);
+      filters.push(`[${k}:a]adelay=${at}S|${at}S[d${k}]`);
     }
     const mix = `${filters.join(";")};${beats.map((_, k) => `[d${k}]`).join("")}amix=inputs=${beats.length}:normalize=0,apad[out]`;
     const out = join(dir, "voice.m4a");
@@ -145,36 +169,6 @@ async function coverFor(videoId: string) {
 
 // ---------------------------------------------------------------- full pipeline
 
-function toBeats(rows: { text: string; hero: string; layout: Beat["layout"]; imageQuery: Beat["imageQuery"]; italic?: boolean }[]): Beat[] {
-  let r = 0;
-  let lastItalic = -9;
-  return rows.map((row, i) => {
-    const prev = rows[i - 1];
-    const sameIdea = prev && prev.imageQuery.queries.join() === row.imageQuery.queries.join() && row.imageQuery.kind !== "none";
-    const visual = row.layout === "card" || row.layout === "cutout";
-    if (visual && !sameIdea) r = (r + 1) % ENTRANCES.length;
-    // italics stay rare: never two in a row, never on the subscribe lines
-    const italic = Boolean(row.italic) && row.layout !== "mascot" && i - lastItalic > 1;
-    if (italic) lastItalic = i;
-    return {
-      id: `b${String(i + 1).padStart(2, "0")}`,
-      text: row.text.trim(),
-      hero: row.hero && row.text.toLowerCase().includes(row.hero.toLowerCase()) ? row.hero : "",
-      layout: row.layout,
-      entrance: visual ? ENTRANCES[r]! : "pop",
-      image: null,
-      candidates: [],
-      imageQuery: row.imageQuery,
-      accent: i % 4 === 2,
-      reveal: row.layout === "text" && i % 3 === 0 ? "fade" : "type",
-      voice: null,
-      voiceText: null,
-      gap: /[.?!…]$/.test(row.text.trim()) ? 0.35 : 0.08,
-      italic,
-    };
-  });
-}
-
 /**
  * The whole pipeline. Every step is saved as soon as it is done and skipped when
  * it already is, so a retry after a lost connection picks up where it stopped:
@@ -206,7 +200,17 @@ export async function generate(videoId: string) {
     await mutateDoc(db(), videoId, "script", (d) => ({ ...d, beats, sources, draft: null }));
   }
 
-  // voice, three sentences at a time, only the lines that do not have theirs yet
+  // voice: the whole script in one take when nothing is voiced yet
+  if (providers().voice && beats.every((b) => !b.voice)) {
+    await setProgress(db(), videoId, { step: "Voix off", done: 0, total: beats.length });
+    try {
+      await voiceTake(videoId);
+    } catch (e) {
+      console.warn("[voix] prise unique impossible, voix plan par plan :", (e as Error).message);
+    }
+    beats = (await load(videoId)).doc.beats;
+  }
+  // then, three sentences at a time, only the lines that do not have theirs yet
   const toVoice = beats.filter((b) => !b.voice || b.voiceText !== b.text);
   const voiceLimit = pLimit(3);
   let voiced = beats.length - toVoice.length;
