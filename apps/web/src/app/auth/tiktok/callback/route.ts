@@ -3,7 +3,7 @@ import { connectTikTok, TikTokError } from "@regie/server";
 import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { safeNext, TIKTOK_STATE } from "@/lib/github";
-import { requireOwner } from "@/lib/http";
+import { appUrl, requireOwner } from "@/lib/http";
 
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   try {
     await requireOwner();
   } catch {
-    return NextResponse.redirect(new URL("/login", req.url));
+    return NextResponse.redirect(appUrl("/login"));
   }
   let saved: { state?: string; next?: string } = {};
   try {
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   } catch {}
   const back = safeNext(saved.next);
   const done = (result: string) => {
-    const res = NextResponse.redirect(new URL(`${back}?tiktok=${result}`, req.url));
+    const res = NextResponse.redirect(appUrl(`${back}?tiktok=${result}`));
     res.cookies.delete({ name: TIKTOK_STATE, path: "/auth/tiktok" });
     return res;
   };

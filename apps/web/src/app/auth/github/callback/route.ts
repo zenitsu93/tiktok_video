@@ -2,13 +2,14 @@ import { env } from "@regie/server";
 import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { github, safeNext, STATE_COOKIE } from "@/lib/github";
+import { appUrl } from "@/lib/http";
 import { createSession, sessionCookie } from "@/lib/session";
 
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 export async function GET(req: NextRequest) {
   const fail = (e: string) => {
-    const res = NextResponse.redirect(new URL(`/login?e=${e}`, req.url));
+    const res = NextResponse.redirect(appUrl(`/login?e=${e}`));
     res.cookies.delete({ name: STATE_COOKIE, path: "/auth/github" });
     return res;
   };
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
   // the GitHub token is not kept: it only served to learn who is signing in
   if (login.toLowerCase() !== env().OWNER_GITHUB_LOGIN.toLowerCase()) return fail("owner");
 
-  const res = NextResponse.redirect(new URL(safeNext(saved.next), req.url));
+  const res = NextResponse.redirect(appUrl(safeNext(saved.next)));
   res.cookies.delete({ name: STATE_COOKIE, path: "/auth/github" });
   res.cookies.set(sessionCookie(await createSession(login)));
   return res;
