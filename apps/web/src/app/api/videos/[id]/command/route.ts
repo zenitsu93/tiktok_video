@@ -21,7 +21,8 @@ export const POST = route(async (req, { params }: Ctx) => {
   if (!instruction) throw new HttpError(400, "Dis ce qu'il faut changer.");
   const row = await getVideo(getDb(), id);
   if (!row?.doc.beats.some((b) => b.id === beatId)) throw new HttpError(404, `Le plan ${beatId} n'existe pas.`);
-  if (IMAGE_ONLY.test(instruction)) await enqueue(JOBS.images, { videoId: id, beatId, instruction });
+  const kind = IMAGE_ONLY.test(instruction) ? "images" : "rewrite";
+  if (kind === "images") await enqueue(JOBS.images, { videoId: id, beatId, instruction });
   else await enqueue(JOBS.rewrite, { videoId: id, beatId, instruction });
-  return NextResponse.json({ queued: true, beatId }, { status: 202 });
+  return NextResponse.json({ queued: true, beatId, kind, instruction }, { status: 202 });
 });

@@ -6,6 +6,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BeatView, VideoView } from "@/lib/view";
 import { StatusChip } from "./status";
+import { chime, Fan, Grooves, LineBusy, Platine, Sleeve, stageOf } from "./waits";
+
+type Job = { kind: "images" | "voice" | "rewrite"; query?: string; at: number };
 
 const tc = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 const usd = (n: number) => `${n.toFixed(n < 1 ? 3 : 2)} $`;
@@ -33,7 +36,12 @@ export function Fil({ initial }: { initial: VideoView }) {
   const [eager, setEager] = useState(0);
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const frame = useRef<HTMLIFrameElement>(null);
+  const [jobs, setJobs] = useState<Record<string, Job>>({});
+  const [done, setDone] = useState(false);
+  // the preview: the previous frame stays, blurred, until the new one is ready
+  const [frames, setFrames] = useState<{ src: string; ready: boolean }[]>([{ src: initial.preview, ready: false }]);
+  const refs = useRef(new Map<string, HTMLIFrameElement>());
+  const readyFrames = useRef(new Set<string>());
   const lastT = useRef(0);
   const url = `/api/videos/${v.id}`;
 
@@ -59,13 +67,53 @@ export function Fil({ initial }: { initial: VideoView }) {
     if (!sel && v.beats[0]) setSel(v.beats[0].id);
   }, [v.beats, sel]);
 
+  const track = (id: string, kind: Job["kind"], query?: string) => setJobs((j) => ({ ...j, [id]: { kind, query, at: Date.now() } }));
+  // forget a job once its line is free again (a few seconds of grace while it waits in the queue)
+  useEffect(() => {
+    setJobs((j) => {
+      const keep = Object.entries(j).filter(([id, job]) => v.busy.includes(id) || Date.now() - job.at < 8000);
+      return keep.length === Object.keys(j).length ? j : Object.fromEntries(keep);
+    });
+  }, [v]);
+
+  useEffect(() => {
+    setFrames((f) => (f.at(-1)?.src === v.preview ? f : [...f.slice(-1), { src: v.preview, ready: false }]));
+  }, [v.preview]);
+
+  // the export is out: sleeve, tab title, chime
+  const prevStatus = useRef(v.status);
+  useEffect(() => {
+    if (prevStatus.current === "rendering" && v.status === "ready" && v.download) {
+      setDone(true);
+      chime();
+      if (document.hidden) document.title = `✓ Prête · ${v.title}`;
+    }
+    prevStatus.current = v.status;
+  }, [v.status, v.download, v.title]);
+  useEffect(() => {
+    const back = () => {
+      if (!document.hidden && document.title.startsWith("✓")) document.title = `${v.title} · Régie`;
+    };
+    document.addEventListener("visibilitychange", back);
+    return () => document.removeEventListener("visibilitychange", back);
+  }, [v.title]);
+
   // preview frame: it talks only through postMessage, and only messages from that frame count
-  const post = useCallback((msg: object) => frame.current?.contentWindow?.postMessage(msg, "*"), []);
+  const newest = frames.at(-1)!.src;
+  const post = useCallback((msg: object) => refs.current.get(newest)?.contentWindow?.postMessage(msg, "*"), [newest]);
   useEffect(() => {
     const on = (ev: MessageEvent) => {
-      if (ev.source !== frame.current?.contentWindow || typeof ev.data?.type !== "string") return;
-      if (ev.data.type === "regie:ready") post({ type: "regie:seek", t: lastT.current });
-      if (ev.data.type === "regie:time") {
+      if (typeof ev.data?.type !== "string") return;
+      const src = [...refs.current].find(([, el]) => el.contentWindow === ev.source)?.[0];
+      if (!src) return;
+      if (ev.data.type === "regie:ready" && src === newest) {
+        readyFrames.current.add(src);
+        refs.current.get(src)?.contentWindow?.postMessage({ type: "regie:seek", t: lastT.current }, "*");
+        setFrames((f) => f.map((x) => (x.src === src ? { ...x, ready: true } : x)));
+        setTimeout(() => setFrames((f) => (f.at(-1)?.src === src ? f.slice(-1) : f)), 300);
+      }
+      // a new frame reports t=0 while it boots: only listen once it has taken over
+      if (ev.data.type === "regie:time" && src === newest && readyFrames.current.has(src)) {
         lastT.current = ev.data.t;
         setT(ev.data.t);
         setPlaying(Boolean(ev.data.playing));
@@ -73,7 +121,7 @@ export function Fil({ initial }: { initial: VideoView }) {
     };
     addEventListener("message", on);
     return () => removeEventListener("message", on);
-  }, [post]);
+  }, [newest]);
 
   const seekTo = (s: number) => {
     lastT.current = s;
@@ -96,9 +144,14 @@ export function Fil({ initial }: { initial: VideoView }) {
     }
   }
 
-  const patch = (id: string, p: BeatPatch, ok?: string) => run(() => call(`${url}/beats/${id}`, "PATCH", p), ok);
-  const action = (id: string, a: "images" | "voice" | "rewrite", instruction?: string, ok?: string) =>
-    run(() => call(`${url}/beats/${id}/${a}`, "POST", instruction ? { instruction } : {}), ok);
+  const patch = (id: string, p: BeatPatch, ok?: string) => {
+    if (p.text !== undefined) track(id, "voice");
+    return run(() => call(`${url}/beats/${id}`, "PATCH", p), ok);
+  };
+  const action = (id: string, a: "images" | "voice" | "rewrite", instruction?: string, ok?: string) => {
+    track(id, a, a === "images" ? instruction || v.beats.find((b) => b.id === id)?.queries[0] : undefined);
+    return run(() => call(`${url}/beats/${id}/${a}`, "POST", instruction ? { instruction } : {}), ok);
+  };
 
   // keyboard: up and down move along the script, "/" goes to the command bar
   const cmd = useRef<HTMLInputElement>(null);
@@ -125,7 +178,9 @@ export function Fil({ initial }: { initial: VideoView }) {
   });
 
   const nowBeat = v.beats.findLast((b) => b.start <= t + 0.01)?.id;
-  const progress = v.progress && v.progress.total > 0 ? Math.round((100 * v.progress.done) / v.progress.total) : 0;
+  // the first pass, from "Lancer" to the first MP4
+  // (between the last image and the export job starting, the video is briefly "ready" without an MP4)
+  const firstRun = !v.download && (v.status === "generating" || v.status === "rendering" || (v.status === "ready" && v.beats.length > 0 && !v.costs.some((c) => c.provider === "render")));
   const voiceMissing = v.beats.some((b) => b.voiceStale);
   const canRender = v.beats.length > 0 && v.status !== "generating" && v.status !== "rendering";
   const upToDate = Boolean(v.download) && v.dirty.length === 0 && !voiceMissing;
@@ -175,16 +230,28 @@ export function Fil({ initial }: { initial: VideoView }) {
               </a>
             )}
           </div>
-          {(v.status === "generating" || v.status === "rendering") && v.progress && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span className="mute" style={{ fontSize: 14 }}>
-                {v.progress.step}
-                {v.progress.total > 1 && ` · ${v.progress.done}/${v.progress.total}`}
-              </span>
-              <div className="bar">
-                <i style={{ width: `${Math.max(4, progress)}%` }} />
+          {firstRun ? (
+            <Platine
+              stage={stageOf(v.progress?.step, v.status === "rendering")}
+              detail={v.progress && v.progress.total > 1 ? `${v.progress.done}/${v.progress.total}` : undefined}
+              compact={v.beats.length > 0}
+            />
+          ) : (
+            v.status === "rendering" &&
+            v.progress && (
+              <div className="export-progress" role="status">
+                <Grooves done={v.progress.done} total={Math.max(1, v.progress.total)} />
+                <div>
+                  <b>
+                    {v.progress.total > 1 ? v.progress.done : 0}
+                    <span>/{v.progress.total > 1 ? v.progress.total : "…"}</span>
+                  </b>
+                  <div className="mute" style={{ fontSize: 14 }}>
+                    plans prêts · seuls les plans modifiés repassent au rendu
+                  </div>
+                </div>
               </div>
-            </div>
+            )
           )}
           {v.error && (
             <p className="chip hot" role="alert" style={{ whiteSpace: "normal", alignSelf: "flex-start" }}>
@@ -194,7 +261,7 @@ export function Fil({ initial }: { initial: VideoView }) {
         </header>
 
         {v.beats.length === 0 && v.status === "generating" && (
-          <p className="mute" style={{ fontSize: 18 }}>
+          <p className="mute" style={{ fontSize: 18, margin: 0 }}>
             Claude écrit l&apos;histoire. Les phrases apparaissent ici dès que le script est découpé.
           </p>
         )}
@@ -208,6 +275,7 @@ export function Fil({ initial }: { initial: VideoView }) {
               selected={sel === b.id}
               current={nowBeat === b.id}
               onChoose={() => choose(b)}
+              job={jobs[b.id]}
               patch={(p, ok) => patch(b.id, p, ok)}
               action={(a, i, ok) => action(b.id, a, i, ok)}
             />
@@ -233,12 +301,34 @@ export function Fil({ initial }: { initial: VideoView }) {
           </details>
         )}
 
-        <Dock v={v} sel={sel} inputRef={cmd} onSent={(ok) => run(async () => null, ok)} onError={(m) => flash(m, true)} />
+        <Dock
+          v={v}
+          sel={sel}
+          inputRef={cmd}
+          onSent={(r) => {
+            track(r.beatId, r.kind, r.kind === "images" ? r.instruction : undefined);
+            void run(async () => null, `Correction envoyée sur ${r.beatId}`);
+          }}
+          onError={(m) => flash(m, true)}
+        />
       </main>
 
       <aside className="fil-side">
         <div className="phone">
-          <iframe ref={frame} key={v.preview} src={v.preview} title="Aperçu de la vidéo" sandbox="allow-scripts" />
+          {frames.map((f, i) => (
+            <iframe
+              key={f.src}
+              ref={(el) => {
+                if (el) refs.current.set(f.src, el);
+                else refs.current.delete(f.src);
+              }}
+              src={f.src}
+              title="Aperçu de la vidéo"
+              sandbox="allow-scripts"
+              className={!f.ready ? "loading" : i < frames.length - 1 ? "stale" : undefined}
+              aria-hidden={i < frames.length - 1 || undefined}
+            />
+          ))}
         </div>
         <div className="transport">
           <button className="btn sm" onClick={() => post({ type: playing ? "regie:pause" : "regie:play" })} aria-label={playing ? "Pause" : "Lecture"}>
@@ -249,6 +339,8 @@ export function Fil({ initial }: { initial: VideoView }) {
         </div>
         <Costs v={v} />
       </aside>
+
+      {done && v.download && <Sleeve title={v.title} artist={v.artist} href={v.download} onClose={() => setDone(false)} />}
 
       {toast && (
         <div className={`toast${toast.err ? " err" : ""}`} role="status">
@@ -277,6 +369,7 @@ function BeatRow({
   v,
   selected,
   current,
+  job,
   onChoose,
   patch,
   action,
@@ -285,12 +378,13 @@ function BeatRow({
   v: VideoView;
   selected: boolean;
   current: boolean;
+  job?: Job;
   onChoose: () => void;
   patch: (p: BeatPatch, ok?: string) => void;
   action: (a: "images" | "voice" | "rewrite", instruction?: string, ok?: string) => void;
 }) {
   const img = b.image ? v.images[b.image] : b.layout === "vinyl" && v.cover ? v.images[v.cover] : undefined;
-  const busy = v.busy.includes(b.id);
+  const busy = v.busy.includes(b.id) || Boolean(job);
   const dirty = v.dirty.includes(b.id);
   return (
     <div id={`beat-${b.id}`} className={`beat${selected ? " sel" : ""}${current ? " playing" : ""}`}>
@@ -307,7 +401,7 @@ function BeatRow({
           <Line b={b} accent={img?.accent ?? null} />
         </span>
         <span className="side">
-          {busy && <Loader2 size={15} className="spin" aria-label="En cours" />}
+          {busy && <LineBusy voice={job ? job.kind === "voice" : b.voiceStale} />}
           {!busy && b.voiceStale && (
             <span className="chip warn" title="La voix ne correspond pas encore au texte">
               <span className="dot" />
@@ -321,7 +415,7 @@ function BeatRow({
           )}
         </span>
       </button>
-      {selected && <Inspector b={b} v={v} busy={busy} patch={patch} action={action} />}
+      {selected && <Inspector b={b} v={v} busy={busy} job={job} patch={patch} action={action} />}
     </div>
   );
 }
@@ -330,12 +424,14 @@ function Inspector({
   b,
   v,
   busy,
+  job,
   patch,
   action,
 }: {
   b: BeatView;
   v: VideoView;
   busy: boolean;
+  job?: Job;
   patch: (p: BeatPatch, ok?: string) => void;
   action: (a: "images" | "voice" | "rewrite", instruction?: string, ok?: string) => void;
 }) {
@@ -386,6 +482,7 @@ function Inspector({
 
       <div className="grp">
         <span className="lab">Image</span>
+        {job?.kind === "images" && <Fan query={job.query} />}
         {b.candidates.length > 0 && (
           <div className="cands">
             {b.candidates.map((c) =>
@@ -476,7 +573,7 @@ function Dock({
   v: VideoView;
   sel: string | null;
   inputRef: React.RefObject<HTMLInputElement | null>;
-  onSent: (ok: string) => void;
+  onSent: (r: { beatId: string; kind: "images" | "rewrite"; instruction: string }) => void;
   onError: (m: string) => void;
 }) {
   const [value, setValue] = useState("");
@@ -488,7 +585,7 @@ function Dock({
     try {
       const r = await call(`/api/videos/${v.id}/command`, "POST", { input: value, selected: sel });
       setValue("");
-      onSent(`Correction envoyée sur ${r.beatId}`);
+      onSent(r);
     } catch (err) {
       onError((err as Error).message);
     } finally {
