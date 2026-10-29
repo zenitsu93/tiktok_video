@@ -272,6 +272,7 @@ body.resizing iframe { pointer-events: none; }
 .launch .logo-in { animation: logo-in 1.4s cubic-bezier(.22,1,.36,1) both; }
 @keyframes logo-in { from { transform: rotate(-300deg) scale(.7); opacity: 0; } }
 .typed i, .typed b { font-style: normal; font-weight: inherit; display: inline-block; animation: ink .25s calc(var(--i) * 70ms + 150ms) both; }
+.launch .typed > span { display: inline-block; white-space: nowrap; }
 .launch .typed span:first-child { font-weight: 600; }
 .typed .q { transform-origin: 50% 90%; animation: q .9s calc(var(--i) * 70ms + 260ms) cubic-bezier(.22,1,.36,1) both; }
 @keyframes ink { from { color: color-mix(in srgb, var(--ink) 15%, transparent); } }
