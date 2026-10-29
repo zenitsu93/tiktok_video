@@ -135,6 +135,34 @@ export async function videoCosts(db: Db, videoId: string) {
     .groupBy(usage.provider, usage.operation);
 }
 
+/** Spending per UTC day and service since a date, for the "Conso" page (UTC days, like the daily budget). */
+export async function usageByDay(db: Db, since: Date) {
+  const day = sql<string>`to_char(${usage.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`;
+  return db
+    .select({ day, provider: usage.provider, calls: sql<number>`COUNT(*)::int`, cost: sql<string>`COALESCE(SUM(${usage.costUsd}), 0)` })
+    .from(usage)
+    .where(gte(usage.createdAt, since))
+    .groupBy(day, usage.provider);
+}
+
+/** Spending per video and service since a date. Rows of deleted videos come back with a null id. */
+export async function usageByVideo(db: Db, since: Date) {
+  return db
+    .select({
+      videoId: usage.videoId,
+      title: videos.title,
+      artist: videos.artist,
+      provider: usage.provider,
+      calls: sql<number>`COUNT(*)::int`,
+      cost: sql<string>`COALESCE(SUM(${usage.costUsd}), 0)`,
+      last: sql<string>`MAX(${usage.createdAt})`,
+    })
+    .from(usage)
+    .leftJoin(videos, eq(videos.id, usage.videoId))
+    .where(gte(usage.createdAt, since))
+    .groupBy(usage.videoId, videos.title, videos.artist, usage.provider);
+}
+
 export async function setError(db: Db, id: string, error: string | null) {
   await db.update(videos).set({ error }).where(eq(videos.id, id));
 }

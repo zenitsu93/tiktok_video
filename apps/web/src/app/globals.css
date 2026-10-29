@@ -10,6 +10,7 @@
   --paper: #ffffff; --ink: #17140f; --mute: #6c655b; --line: #e6e0d7; --panel: #f6f3ee; --panel2: #efeae2;
   --accent: #d6381c; --accent-soft: #fbe5df; --ok: #2e7a4d; --ok-soft: #e1f1e7; --warn: #a86b12; --warn-soft: #f8ecd6;
   --disc: #151515; --groove: #262626;
+  --c-claude: #d6381c; --c-voice: #17140f; --c-img: #c9a36b;
   --f: "Oswald", "Arial Narrow", Impact, sans-serif;
   --mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
   color-scheme: light;
@@ -19,6 +20,7 @@
     --paper: #121110; --ink: #f2eee7; --mute: #a59d91; --line: #2d2a25; --panel: #1b1916; --panel2: #24211d;
     --accent: #ff5d3d; --accent-soft: #3a1d16; --ok: #5fc289; --ok-soft: #173023; --warn: #e3a54a; --warn-soft: #33270f;
     --disc: #0a0a0a; --groove: #2c2c2c;
+    --c-claude: #ff5d3d; --c-voice: #f2eee7; --c-img: #c9a36b;
     color-scheme: dark;
   }
 }
@@ -202,4 +204,39 @@ body.resizing iframe { pointer-events: none; }
   .lecture { padding: 12px 16px 60px; }
   .lecture-page textarea { font-size: 18px; padding: 16px; min-height: 48vh; }
   .lecture-ask { flex-direction: column; }
+}
+
+/* Conso: spending per day and per video against the budgets */
+.conso { max-width: 1180px; margin: 0 auto; padding: 18px 28px 60px; display: flex; flex-direction: column; gap: 16px; }
+.conso .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-left: auto; }
+.conso .seg a { padding: 5px 12px; font-size: 14px; font-weight: 400; color: var(--mute); text-decoration: none; }
+.conso .seg a[aria-current="page"] { background: var(--ink); color: var(--paper); }
+.conso .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.conso .tile { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.conso .tile .k { font-size: 13px; color: var(--mute); display: flex; align-items: center; gap: 6px; font-weight: 400; }
+.conso .tile .v { font-size: 30px; font-weight: 500; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.conso .tile .s { font-size: 13px; color: var(--mute); }
+.conso .tile.total { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.conso .tile.total .k, .conso .tile.total .s { color: color-mix(in srgb, var(--paper) 70%, transparent); }
+.conso .spark { width: 100%; height: 30px; display: block; margin-top: 4px; }
+.conso .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+.conso .legend { display: inline-flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--mute); }
+.conso .legend span { display: inline-flex; align-items: center; gap: 5px; }
+.conso-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.conso-grid .panel { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.conso .bars { width: 100%; height: auto; display: block; }
+.conso .bars text { font-family: var(--mono); font-size: 11px; fill: var(--mute); }
+.conso .bars text.budget { fill: var(--accent); }
+.ctable { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ctable th { text-align: left; font-weight: 400; color: var(--mute); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; padding: 0 0 6px; }
+.ctable td { padding: 7px 0; border-top: 1px solid var(--line); vertical-align: middle; }
+.ctable .amt { text-align: right; padding-left: 12px; white-space: nowrap; }
+.ctable .num { font-variant-numeric: tabular-nums; }
+.split { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--panel2); min-width: 60px; }
+.split i { display: block; height: 100%; }
+@media (max-width: 760px) {
+  .conso { padding: 12px 16px 40px; }
+  .conso .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .conso-grid { grid-template-columns: 1fr; }
+  .conso .seg { margin-left: 0; }
 }
