@@ -36,6 +36,18 @@ main() {
 
 	compose="docker compose -f deploy/docker-compose.yml"
 	$compose pull --quiet web worker
+
+	# Une tâche en cours (export, génération, envoi TikTok) finit avant que le worker redémarre,
+	# dix minutes au plus : coupé en plein export, le montage resterait en plan un quart d'heure.
+	i=0
+	while [ "$i" -lt 60 ]; do
+		busy="$(docker exec regie-db psql -At -U regie -d regie -c "select count(*) from pgboss.job where state = 'active'" 2>/dev/null || echo 0)"
+		[ "$busy" = 0 ] && break
+		[ "$i" = 0 ] && echo "[deploy] $busy tâche(s) en cours : attente de leur fin avant de relancer"
+		i=$((i + 1))
+		sleep 10
+	done
+
 	$compose up -d --remove-orphans --wait --wait-timeout 300
 
 	# Le disque du VPS est compté : seule la version en ligne reste.

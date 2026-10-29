@@ -64,7 +64,7 @@ jobs:
     # Sur main, une fois le serveur déclaré (variable VPS_HOST).
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.VPS_HOST != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     permissions:
       contents: read
       packages: read
