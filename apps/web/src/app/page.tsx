@@ -4,6 +4,7 @@ import { Gauge } from "lucide-react";
 import Link from "next/link";
 import { LaunchForm } from "@/components/launch-form";
 import { StatusChip } from "@/components/status";
+import { TypedTitle } from "@/components/typed-title";
 import { ownerOrLogin } from "@/lib/owner";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export default async function Home() {
     <main className="launch">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="Thomas" width={44} height={44} />
+        <img className="logo-in" src="/logo.svg" alt="Thomas" width={44} height={44} />
         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
           <Link href="/conso" className="btn ghost sm">
             <Gauge size={15} /> Conso
@@ -29,9 +30,7 @@ export default async function Home() {
           </form>
         </div>
       </div>
-      <h1>
-        Quelle <span>chanson ?</span>
-      </h1>
+      <TypedTitle first="Quelle" second="chanson ?" />
       {demo.length > 0 && (
         <p className="chip warn" style={{ alignSelf: "flex-start", whiteSpace: "normal" }}>
           <span className="dot" />
@@ -43,8 +42,8 @@ export default async function Home() {
         <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <span className="eyebrow">Tes vidéos</span>
           <nav className="vlist">
-            {videos.map((v) => (
-              <Link key={v.id} href={`/v/${v.id}`}>
+            {videos.map((v, i) => (
+              <Link key={v.id} href={`/v/${v.id}`} style={{ "--i": Math.min(i, 8) } as React.CSSProperties}>
                 <span className="t">
                   {v.title} <span>· {v.artist}</span>
                 </span>

@@ -247,3 +247,19 @@ body.resizing iframe { pointer-events: none; }
   .conso-grid { grid-template-columns: 1fr; }
   .conso .seg { margin-left: 0; }
 }
+
+/* launch screen, entrance: the title types itself, the logo turns once, the list follows */
+.launch .logo-in { animation: logo-in 1.4s cubic-bezier(.22,1,.36,1) both; }
+@keyframes logo-in { from { transform: rotate(-300deg) scale(.7); opacity: 0; } }
+.typed i, .typed b { font-style: normal; font-weight: inherit; display: inline-block; animation: ink .25s calc(var(--i) * 70ms + 150ms) both; }
+.launch .typed span:first-child { font-weight: 600; }
+.typed .q { transform-origin: 50% 90%; animation: q .9s calc(var(--i) * 70ms + 260ms) cubic-bezier(.22,1,.36,1) both; }
+@keyframes ink { from { color: color-mix(in srgb, var(--ink) 15%, transparent); } }
+@keyframes q { 0% { transform: translateY(-.5em) rotate(-14deg); opacity: 0; } 60% { transform: translateY(.05em) rotate(4deg); opacity: 1; } 100% { transform: none; opacity: 1; } }
+.launch form .field::placeholder { transition: none; }
+.launch .go { transition: transform .12s ease; }
+.launch .go:active:not(:disabled) { transform: scale(.98); }
+.launch .go .disc .lab { background: #fff; }
+.launch .go .disc .lab::after { background: var(--accent); }
+.vlist a { animation: rise .5s calc(var(--i, 0) * 60ms + 900ms) cubic-bezier(.22,1,.36,1) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
