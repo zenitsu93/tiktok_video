@@ -1,6 +1,6 @@
 import { applyBeatPatch, beatContext, FPS, timeBeats, type Asset, type Beat, type VideoDoc } from "@regie/core";
-import { getAsset, getDb, getVideo, mutateDoc, setBusy, setProgress, setRendered, setStatus } from "@regie/db";
-import { enqueue, JOBS, providers, storage } from "@regie/server";
+import { createTikTokSend, getAsset, getDb, getVideo, lastTikTokSend, mutateDoc, setBusy, setProgress, setRendered, setStatus, tiktokSendInFlight } from "@regie/db";
+import { enqueue, env, JOBS, providers, storage, tiktokConfigured, tiktokConnected } from "@regie/server";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import pLimit from "p-limit";
@@ -336,5 +336,22 @@ export async function render(videoId: string) {
   await setRendered(db(), videoId, res.asset.id, res.hashes);
   await setStatus(db(), videoId, "ready");
   console.log(`[render] ${videoId}: ${res.rendered}/${res.total} scènes rendues, le reste venait du cache`);
+  // the export is done either way: a send that cannot start shows on its line, or the button stays
+  await autoSend(videoId, res.asset.id).catch((e) => console.warn("[tiktok] envoi automatique :", (e as Error).message));
+  // a video from before the captions, or whose caption failed, gets one now, ready to paste
+  if (!(await load(videoId)).doc.caption) await caption(videoId).catch((e) => console.warn("[légende]", (e as Error).message));
+}
+
+/**
+ * Each finished export goes to the TikTok inbox by itself, once TikTok is connected
+ * (TIKTOK_AUTO_SEND=0 leaves it to the button). An export already sent does not go twice.
+ */
+export async function autoSend(videoId: string, renderAsset: string) {
+  if (env().TIKTOK_AUTO_SEND === "0" || !tiktokConfigured() || !(await tiktokConnected(db()))) return;
+  const last = await lastTikTokSend(db(), videoId);
+  if (last?.renderAsset === renderAsset && last.status !== "error") return;
+  if (await tiktokSendInFlight(db(), videoId)) return;
+  const sendId = await createTikTokSend(db(), videoId, renderAsset);
+  await enqueue(JOBS.tiktok, { videoId, sendId });
 }
 

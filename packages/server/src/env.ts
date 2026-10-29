@@ -39,6 +39,8 @@ const schema = z.object({
   /** TikTok app (Login Kit + Content Posting API, video.upload only): sends exports to the TikTok inbox. */
   TIKTOK_CLIENT_KEY: optional,
   TIKTOK_CLIENT_SECRET: optional,
+  /** Each finished export goes to the TikTok inbox by itself (0: only with the button). */
+  TIKTOK_AUTO_SEND: z.enum(["0", "1"]).default("1"),
 
   STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
   STORAGE_DIR: z.string().default("./data"),

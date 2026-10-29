@@ -2,6 +2,7 @@ import { getDb, listVideos } from "@regie/db";
 import { providers } from "@regie/server";
 import { Gauge } from "lucide-react";
 import Link from "next/link";
+import { CopyCaption } from "@/components/caption";
 import { DeleteVideo } from "@/components/delete-video";
 import { LaunchForm } from "@/components/launch-form";
 import { StatusChip } from "@/components/status";
@@ -54,6 +55,7 @@ export default async function Home() {
                     {new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(v.updatedAt)}
                   </span>
                 </Link>
+                {v.caption && <CopyCaption text={v.caption} label="Légende" />}
                 <DeleteVideo id={v.id} short />
               </div>
             ))}

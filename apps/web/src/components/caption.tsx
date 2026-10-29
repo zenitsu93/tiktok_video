@@ -6,34 +6,40 @@ import type { VideoView } from "@/lib/view";
 import { Disc } from "./waits";
 
 /**
- * The TikTok caption, under the preview. The send to TikTok carries no text (the inbox
- * takes the file only), so Thomas copies it here and pastes it when he adds the sound.
+ * Copies the caption. Thomas posts from his phone, so it is also on each line of the
+ * home screen: copy there, then paste in TikTok while adding the sound.
  */
-export function Caption({ v, write, flash }: { v: VideoView; write: () => void; flash: (text: string, err?: boolean) => void }) {
-  const [copied, setCopied] = useState(false);
+export function CopyCaption({ text, label = "Copier" }: { text: string; label?: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  async function copy() {
+    const ok = await navigator.clipboard.writeText(text).then(
+      () => true,
+      () => false,
+    );
+    setState(ok ? "copied" : "failed");
+    setTimeout(() => setState("idle"), 2000);
+  }
+  return (
+    <button className="btn sm" onClick={copy} title={state === "failed" ? "Copie impossible : sélectionne le texte à la main" : text}>
+      {state === "copied" ? <Check size={14} /> : <Copy size={14} />} {state === "copied" ? "Copiée" : state === "failed" ? "Copie impossible" : label}
+    </button>
+  );
+}
+
+/**
+ * The TikTok caption, under the preview. The send to TikTok carries no text (the inbox
+ * takes the file only), so Thomas copies it and pastes it when he adds the sound.
+ */
+export function Caption({ v, write }: { v: VideoView; write: () => void }) {
   if (!v.beats.length) return null;
   const writing = v.busy.includes("caption");
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(v.caption ?? "");
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      flash("Copie impossible : sélectionne le texte à la main.", true);
-    }
-  }
 
   return (
     <section className="panel">
       <div className="r" style={{ alignItems: "center" }}>
         <b>Légende TikTok</b>
         <span style={{ display: "flex", gap: 6 }}>
-          {v.caption && (
-            <button className="btn sm" onClick={copy} disabled={writing}>
-              {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? "Copiée" : "Copier"}
-            </button>
-          )}
+          {v.caption && !writing && <CopyCaption text={v.caption} />}
           <button className="btn ghost sm" onClick={write} disabled={writing} title="Claude l'écrit à partir du script tel qu'il est maintenant">
             {writing ? <Disc size={14} /> : <RotateCcw size={14} />} {writing ? "Écriture…" : v.caption ? "Réécrire" : "Écrire la légende"}
           </button>

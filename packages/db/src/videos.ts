@@ -20,7 +20,15 @@ export async function getVideo(db: Db, id: string): Promise<VideoRow | undefined
 
 export async function listVideos(db: Db, limit = 30) {
   return db
-    .select({ id: videos.id, title: videos.title, artist: videos.artist, status: videos.status, updatedAt: videos.updatedAt, renderAsset: videos.renderAsset })
+    .select({
+      id: videos.id,
+      title: videos.title,
+      artist: videos.artist,
+      status: videos.status,
+      updatedAt: videos.updatedAt,
+      renderAsset: videos.renderAsset,
+      caption: sql<string | null>`${videos.doc}->>'caption'`,
+    })
     .from(videos)
     .orderBy(desc(videos.updatedAt))
     .limit(limit);

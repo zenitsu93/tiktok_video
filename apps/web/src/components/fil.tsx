@@ -498,7 +498,7 @@ export function Fil({ initial }: { initial: VideoView }) {
             </button>
           </div>
         </div>
-        <Caption v={v} flash={flash} write={() => run(() => call(`${url}/caption`, "POST").then(refresh), "Claude écrit la légende")} />
+        <Caption v={v} write={() => run(() => call(`${url}/caption`, "POST").then(refresh), "Claude écrit la légende")} />
         <Costs v={v} />
       </aside>
 
