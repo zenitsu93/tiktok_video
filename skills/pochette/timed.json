@@ -1,0 +1,238 @@
+[
+ {
+  "id": "b01",
+  "text": "Tu connais l'histoire de",
+  "hero": "",
+  "img": "platine",
+  "gap": 0.05,
+  "start": 0.25,
+  "end": 1.252
+ },
+ {
+  "id": "b02",
+  "text": "Like a Tattoo, de Sade ?",
+  "hero": "Like a Tattoo",
+  "img": "platine",
+  "gap": 0.35,
+  "start": 1.302,
+  "end": 2.502,
+  "it": "title"
+ },
+ {
+  "id": "b03",
+  "text": "Je raconte l'histoire derrière vos chansons préférées,",
+  "hero": "",
+  "img": "mascotte",
+  "gap": 0.1,
+  "start": 2.852,
+  "end": 5.381
+ },
+ {
+  "id": "b04",
+  "text": "alors abonne-toi pour la suite,",
+  "hero": "abonne-toi",
+  "img": "mascotte",
+  "gap": 0.05,
+  "start": 5.481,
+  "end": 6.936
+ },
+ {
+  "id": "b05",
+  "text": "ça me soutient énormément.",
+  "hero": "énormément",
+  "img": "mascotte",
+  "gap": 0.35,
+  "start": 6.986,
+  "end": 8.328
+ },
+ {
+  "id": "b06",
+  "text": "Mais au fait, cette chanson n'est pas née en studio.",
+  "hero": "studio",
+  "img": "03-studio",
+  "gap": 0.25,
+  "start": 8.678,
+  "end": 10.812
+ },
+ {
+  "id": "b07",
+  "text": "Elle est née dans un bar.",
+  "hero": "bar",
+  "img": "04-bar",
+  "gap": 0.35,
+  "start": 11.062,
+  "end": 12.085
+ },
+ {
+  "id": "b08",
+  "text": "Début des années 90, à New York.",
+  "hero": "New York",
+  "img": "05-newyork",
+  "gap": 0.25,
+  "start": 12.435,
+  "end": 15.1
+ },
+ {
+  "id": "b09",
+  "text": "Sade Adu est assise dans un bar de Manhattan",
+  "hero": "Sade Adu",
+  "img": "06-sade",
+  "gap": 0.08,
+  "start": 15.35,
+  "end": 17.553
+ },
+ {
+  "id": "b10",
+  "text": "quand un inconnu commence à lui parler.",
+  "hero": "inconnu",
+  "img": "07-inconnu",
+  "gap": 0.35,
+  "start": 17.633,
+  "end": 19.41
+ },
+ {
+  "id": "b11",
+  "text": "C'est un ancien soldat.",
+  "hero": "soldat",
+  "img": "08-soldat",
+  "gap": 0.25,
+  "start": 19.76,
+  "end": 20.832
+ },
+ {
+  "id": "b12",
+  "text": "Il a fait la guerre,",
+  "hero": "guerre",
+  "img": "09-guerre",
+  "gap": 0.1,
+  "start": 21.082,
+  "end": 21.985
+ },
+ {
+  "id": "b13",
+  "text": "et ce qu'il a vu là-bas ne l'a jamais quitté.",
+  "hero": "jamais",
+  "img": "09-guerre",
+  "gap": 0.4,
+  "start": 22.085,
+  "end": 23.964
+ },
+ {
+  "id": "b14",
+  "text": "On ne sait presque rien de cet homme.",
+  "hero": "rien",
+  "img": "",
+  "gap": 0.2,
+  "start": 24.364,
+  "end": 25.974
+ },
+ {
+  "id": "b15",
+  "text": "Mais sa confession, elle, est restée.",
+  "hero": "confession",
+  "img": "11-confession",
+  "gap": 0.35,
+  "start": 26.174,
+  "end": 27.839,
+  "it": "hero"
+ },
+ {
+  "id": "b16",
+  "text": "Avec Andrew Hale et Stuart Matthewman,",
+  "hero": "",
+  "img": "12-groupe",
+  "gap": 0.08,
+  "start": 28.189,
+  "end": 30.091
+ },
+ {
+  "id": "b17",
+  "text": "Sade en fait une chanson.",
+  "hero": "chanson",
+  "img": "12-groupe",
+  "gap": 0.3,
+  "start": 30.171,
+  "end": 31.377
+ },
+ {
+  "id": "b18",
+  "text": "Juste une guitare, une voix calme,",
+  "hero": "guitare",
+  "img": "13-guitare",
+  "gap": 0.15,
+  "start": 31.677,
+  "end": 33.202
+ },
+ {
+  "id": "b19",
+  "text": "et cette idée : il y a des souvenirs qu'on ne peut pas effacer.",
+  "hero": "effacer",
+  "img": "",
+  "gap": 0.25,
+  "start": 33.352,
+  "end": 35.949,
+  "lines": [
+   "et cette idée :",
+   "il y a des souvenirs",
+   "qu'on ne peut pas",
+   "effacer."
+  ],
+  "it": "line:2"
+ },
+ {
+  "id": "b20",
+  "text": "Ils restent sur toi, comme un tatouage.",
+  "hero": "tatouage",
+  "img": "15-tatouage",
+  "gap": 0.35,
+  "start": 36.199,
+  "end": 38.093
+ },
+ {
+  "id": "b21",
+  "text": "En 1992,",
+  "hero": "1992",
+  "img": "",
+  "gap": 0.08,
+  "start": 38.443,
+  "end": 39.846
+ },
+ {
+  "id": "b22",
+  "text": "Like a Tattoo sort sur l'album Love Deluxe.",
+  "hero": "Love Deluxe",
+  "img": "16-lovedeluxe",
+  "gap": 0.4,
+  "start": 39.926,
+  "end": 42.223,
+  "it": "hero"
+ },
+ {
+  "id": "b23",
+  "text": "Ce n'est pas juste une chanson.",
+  "hero": "juste",
+  "img": "",
+  "gap": 0.2,
+  "start": 42.623,
+  "end": 43.981
+ },
+ {
+  "id": "b24",
+  "text": "C'est la cicatrice d'un inconnu, gravée pour toujours.",
+  "hero": "cicatrice",
+  "img": "18-cicatrice",
+  "gap": 0.4,
+  "start": 44.181,
+  "end": 46.763,
+  "it": "tail"
+ },
+ {
+  "id": "b25",
+  "text": "Tu connaissais cette histoire ?",
+  "hero": "",
+  "img": "platine",
+  "gap": 2.6,
+  "start": 47.163,
+  "end": 48.429
+ }
+]
