@@ -1,5 +1,5 @@
 import { applyBeatPatch, beatContext, FPS, timeBeats, type Asset, type Beat, type VideoDoc } from "@regie/core";
-import { createTikTokSend, getAsset, getDb, getVideo, lastTikTokSend, mutateDoc, setBusy, setProgress, setRendered, setStatus, tiktokSendInFlight } from "@regie/db";
+import { createTikTokSend, getAsset, getDb, getVideo, lastTikTokSend, mutateDoc, setBusy, setError, setProgress, setRendered, setStatus, tiktokSendInFlight } from "@regie/db";
 import { enqueue, env, JOBS, providers, storage, tiktokConfigured, tiktokConnected } from "@regie/server";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
@@ -103,14 +103,15 @@ export async function remixVoice(videoId: string) {
 // ---------------------------------------------------------------- images
 
 /**
- * Downloads up to `want` new candidates for a set of beats that share one idea.
+ * Downloads up to `want` new candidates for a set of beats that share one idea, and says how many came.
  * `select` makes the first new image the shown one (used when Thomas asked for another image).
+ * `deeper` reads further down the same searches: the first results are already in the candidates.
  */
-export async function imagesFor(videoId: string, beatIds: string[], opts: { queries?: string[]; select?: boolean; want?: number } = {}) {
+export async function imagesFor(videoId: string, beatIds: string[], opts: { queries?: string[]; select?: boolean; want?: number; deeper?: boolean } = {}) {
   const { doc } = await load(videoId);
   const beats = doc.beats.filter((b) => beatIds.includes(b.id));
   const first = beats[0];
-  if (!first) return;
+  if (!first) return 0;
   const query = opts.queries?.length ? { kind: "pinterest" as const, queries: opts.queries } : first.imageQuery;
   const known = new Set(Object.values(doc.assets).map((a) => a.source));
   const want = opts.want ?? 6;
@@ -122,7 +123,8 @@ export async function imagesFor(videoId: string, beatIds: string[], opts: { quer
   } else if (query.kind === "pinterest") {
     if (providers().images) {
       const urls: string[] = [];
-      for (const q of query.queries) urls.push(...(await searchPinterest(videoId, q, want)));
+      const pins = opts.deeper ? Math.min(30, want + first.candidates.length) : want;
+      for (const q of query.queries) urls.push(...(await searchPinterest(videoId, q, pins)));
       for (const url of [...new Set(urls)].filter((u) => !known.has(u))) {
         if (added.length >= want) break;
         try {
@@ -138,7 +140,7 @@ export async function imagesFor(videoId: string, beatIds: string[], opts: { quer
       }
     }
   }
-  if (!added.length) return;
+  if (!added.length) return 0;
   await mutateDoc(db(), videoId, `images ${beatIds.join(",")}`, (d) => ({
     ...d,
     assets: { ...d.assets, ...Object.fromEntries(added.map((a) => [a.id, a])) },
@@ -153,6 +155,7 @@ export async function imagesFor(videoId: string, beatIds: string[], opts: { quer
       };
     }),
   }));
+  return added.length;
 }
 
 async function coverFor(videoId: string) {
@@ -313,14 +316,21 @@ export async function rewrite(videoId: string, beatId: string, instruction: stri
 
 export async function moreImages(videoId: string, beatId: string, instruction?: string) {
   await onBeat(videoId, beatId, async () => {
-    if (instruction && providers().claude) {
-      const { doc } = await load(videoId);
-      const edit = await editBeat(videoId, beatContext(doc, beatId), `Trouve d'autres images : ${instruction}`);
-      await imagesFor(videoId, [beatId], { queries: edit.imageQueries ?? undefined, select: true, want: 4 });
+    const { doc } = await load(videoId);
+    const beat = doc.beats.find((b) => b.id === beatId)!;
+    let added: number;
+    if (instruction || beat.imageQuery.kind === "none") {
+      // with an instruction, or for a line the split left without a search: new searches from the context
+      const ask = instruction ? `Trouve d'autres images : ${instruction}` : "Ce passage n'a pas encore d'image : trouve-lui des images.";
+      const queries = providers().claude ? (await editBeat(videoId, beatContext(doc, beatId), ask)).imageQueries : null;
+      const plain = (instruction ?? (beat.hero || beat.text)).replace(/[^\p{L}\p{N}' -]/gu, " ").trim();
+      added = await imagesFor(videoId, [beatId], { queries: queries?.length ? queries : [plain], select: true, want: 4 });
     } else {
-      // no model call: same searches, next results
-      await imagesFor(videoId, [beatId], { want: 4 });
+      // no model call: the same searches, further down the results
+      added = await imagesFor(videoId, [beatId], { want: 4, deeper: true });
     }
+    // the button must not look dead: say so, and how to get something else
+    if (!added) await setError(db(), videoId, `Pas de nouvelle image pour ${beatId}. Décris ce que tu veux dans la barre : « @${beatId} une photo de … »`);
   });
 }
 
