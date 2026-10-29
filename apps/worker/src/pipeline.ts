@@ -6,8 +6,8 @@ import { extname, join } from "node:path";
 import pLimit from "p-limit";
 import { takeCuts, toBeats } from "./beats";
 import { ff, ingestImage, ingestVoice, sliceTake, storeFile, withTemp } from "./media";
-import { editBeat, splitScript, writeScript } from "./providers/claude";
-import { demoImages, demoScript, demoSplit, demoVoice } from "./providers/demo";
+import { editBeat, splitScript, writeCaption, writeScript } from "./providers/claude";
+import { demoCaption, demoImages, demoScript, demoSplit, demoVoice } from "./providers/demo";
 import { speak, speakTake } from "./providers/elevenlabs";
 import { deezerCover, fetchImage, searchPinterest } from "./providers/images";
 import { exportVideo } from "./render";
@@ -252,8 +252,24 @@ export async function generate(videoId: string) {
     ),
   );
   if (!(await load(videoId)).doc.cover) await coverFor(videoId);
+  // a caption that fails does not hold the video back: the « Écrire la légende » button retries it
+  if (!(await load(videoId)).doc.caption) await caption(videoId).catch((e) => console.warn("[légende]", (e as Error).message));
   await setStatus(db(), videoId, "ready");
   await enqueue(JOBS.render, { videoId });
+}
+
+/** The TikTok caption, from the beats as they read now (so a « Réécrire » follows the edits). */
+export async function caption(videoId: string) {
+  const { doc } = await load(videoId);
+  if (!doc.beats.length) return;
+  await setBusy(db(), videoId, "caption", true);
+  try {
+    const script = doc.beats.map((b) => b.text).join(" ");
+    const text = providers().claude ? await writeCaption(videoId, doc, script) : demoCaption(doc.title, doc.artist);
+    await mutateDoc(db(), videoId, "légende", (d) => ({ ...d, caption: text }));
+  } finally {
+    await setBusy(db(), videoId, "caption", false);
+  }
 }
 
 /** Rewrites the whole script from Thomas's instruction, before he approves it. */

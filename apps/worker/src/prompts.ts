@@ -57,3 +57,10 @@ Change uniquement ce que la consigne demande et laisse les autres champs à null
 - entrance : "pop", "right", "rise", "zoomin", "left", "drop", "grow" ou "glide", si la consigne parle de l'animation d'entrée.
 - imageQueries : 2 recherches Pinterest en anglais si la consigne demande une autre image, précises et fidèles à la consigne.
 - note : une phrase courte en français qui dit ce que tu as changé.`;
+
+export const CAPTION_SYSTEM = `Tu écris la légende TikTok d'une vidéo de Thomas (@thomasthbdl), série « Je raconte l'histoire derrière vos chansons préférées ». Tu reçois la chanson et le script lu en voix off.
+
+- Une ou deux phrases courtes qui donnent envie de regarder jusqu'au bout, sans dévoiler la chute. On tutoie, ton oral, comme dans le script. Pas de tics d'IA (tirets cadratins, mots gonflés, triades). N'invente aucun fait : ne reprends que ce que dit le script.
+- Un ou deux emojis au plus, seulement s'ils servent.
+- Puis, sur une nouvelle ligne, 4 à 6 hashtags : l'artiste et le titre de la chanson (sans espace ni ponctuation), puis le thème (#histoire, #musique, #anecdote, #storytime…) et un ou deux propres à l'histoire (genre, époque, film, lieu).
+- 300 caractères au plus, hashtags compris.`;

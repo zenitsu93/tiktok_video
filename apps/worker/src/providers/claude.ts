@@ -4,13 +4,14 @@ import { ENTRANCES, imageQuerySchema, type Beat } from "@regie/core";
 import { getDb, recordUsage } from "@regie/db";
 import { assertBudget, claudeCost, env } from "@regie/server";
 import { z } from "zod";
-import { EDIT_SYSTEM, SCRIPT_SYSTEM, SPLIT_SYSTEM } from "../prompts";
+import { CAPTION_SYSTEM, EDIT_SYSTEM, SCRIPT_SYSTEM, SPLIT_SYSTEM } from "../prompts";
 
 /**
- * Three calls, each sized to its job:
+ * Four calls, each sized to its job:
  * - writeScript: researches with web search and writes the script (once per video);
  * - splitScript: cuts the script into beats as strict JSON (once per video);
- * - editBeat: changes one beat from a typed instruction, with only its neighbours as context.
+ * - editBeat: changes one beat from a typed instruction, with only its neighbours as context;
+ * - writeCaption: the TikTok caption and hashtags, from the script as it reads now.
  * System prompts are frozen and cached; fallbacks reroute a declined request automatically.
  */
 
@@ -151,4 +152,25 @@ export async function editBeat(videoId: string, ctx: { before: string[]; target:
   checkStop(msg.stop_reason, "la retouche");
   if (!msg.parsed_output) throw new Error("La retouche reçue n'est pas lisible.");
   return msg.parsed_output;
+}
+
+const captionSchema = z.object({ caption: z.string() });
+
+export async function writeCaption(videoId: string, song: { title: string; artist: string }, script: string) {
+  await assertBudget(videoId);
+  const msg = await api().beta.messages.parse({
+    model: env().CLAUDE_MODEL,
+    max_tokens: 2000,
+    betas: BETAS,
+    fallbacks: "default",
+    output_config: { effort: "low", format: betaZodOutputFormat(captionSchema) },
+    cache_control: { type: "ephemeral" },
+    system: CAPTION_SYSTEM,
+    messages: [{ role: "user", content: `Chanson : « ${song.title} » de ${song.artist}.\n\nScript :\n${script}` }],
+  });
+  await logUsage(videoId, "légende", msg.usage);
+  checkStop(msg.stop_reason, "la légende");
+  const caption = msg.parsed_output?.caption.trim();
+  if (!caption) throw new Error("La légende reçue est vide.");
+  return caption.slice(0, 2200);
 }

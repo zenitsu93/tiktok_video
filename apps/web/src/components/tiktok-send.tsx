@@ -69,9 +69,9 @@ export function TikTokSend({ v, onQueued, flash }: { v: VideoView; onQueued: () 
         )}
       </button>
       {sent && (
-        <span className="chip ok" title="Ouvre la notification dans TikTok, ajoute le son, puis publie">
+        <span className="chip ok" title="App TikTok, Boîte de réception : ouvre la notification, ajoute le son, colle la légende, puis publie">
           <span className="dot" />
-          Dans tes brouillons TikTok
+          Dans ta boîte de réception TikTok
         </span>
       )}
       {current?.status === "error" && current.error && (

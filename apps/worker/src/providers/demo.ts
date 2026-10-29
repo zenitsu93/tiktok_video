@@ -63,3 +63,8 @@ export async function demoImages(query: string, count: number, seed: number): Pr
   }
   return out;
 }
+
+export function demoCaption(title: string, artist: string): string {
+  const tag = (s: string) => s.normalize("NFD").replace(/[^A-Za-z0-9]/g, "");
+  return `Tu connais l'histoire de ${title} ? Légende de démonstration : ajoute ta clé Claude pour la vraie.\n#${tag(artist)} #${tag(title)} #histoire #musique`;
+}
