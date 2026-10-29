@@ -6,7 +6,8 @@ Usage :
   puis : cd dossier_projet && npx hyperframes render --quality delivery --output intro.mp4
 
 --mode intro : 3 s (entrée + tenue). --mode outro : 2.6 s (tenue + sortie). --mode both : 6 s (démo).
-Le dossier --fonts doit contenir Kaneda-Regular.otf, Kaneda-Black.otf, Kaneda-BlackItalic.otf.
+Le dossier --fonts doit contenir les graisses Regular et Black de Kaneda (ex. brand/fonts/kaneda/ du dépôt) ;
+la Black Italic est utilisée si elle est là, sinon l'italique est synthétisé.
 gsap.min.js et CustomEase.min.js sont copiés depuis --gsap (dossier vendor/npm/gsap@*/dist de HyperFrames).
 """
 import argparse, html, json, os, shutil
@@ -27,8 +28,25 @@ os.makedirs(os.path.join(a.out, 'assets/fonts'), exist_ok=True)
 os.makedirs(os.path.join(a.out, 'assets/img'), exist_ok=True)
 for f in ('gsap.min.js', 'CustomEase.min.js'):
     shutil.copy(os.path.join(a.gsap, f), os.path.join(a.out, 'assets', f))
-for f in ('Kaneda-Regular.otf', 'Kaneda-Black.otf', 'Kaneda-BlackItalic.otf'):
-    shutil.copy(os.path.join(a.fonts, f), os.path.join(a.out, 'assets/fonts', f))
+# accepte Kaneda-Black.otf comme kaneda-gothic-black.otf (brand/fonts/kaneda/ du dépôt)
+def find_font(style):
+    for f in sorted(os.listdir(a.fonts)):
+        n = os.path.splitext(f)[0].lower().replace('_', '-').replace(' ', '-')
+        if f.lower().endswith(('.otf', '.ttf', '.woff2')) and n.endswith('-' + style):
+            return f
+    return None
+FONTS = {}
+for style in ('regular', 'black', 'blackitalic'):
+    f = find_font(style)
+    if f:
+        shutil.copy(os.path.join(a.fonts, f), os.path.join(a.out, 'assets/fonts', f))
+        FONTS[style] = f
+for style in ('regular', 'black'):
+    if style not in FONTS:
+        raise SystemExit(f'police Kaneda {style} introuvable dans {a.fonts}')
+# sans Black Italic, pas de @font-face italique : le navigateur penche la Black (italique synthétique)
+ITALIC_FACE = ('@font-face { font-family:"Kaneda"; font-weight:900; font-style:italic; src:url("assets/fonts/%s"); }'
+               % FONTS['blackitalic']) if 'blackitalic' in FONTS else ''
 # pochette carrée 1000 px, recadrée au centre
 im = Image.open(a.cover).convert('RGB'); w, h = im.size; s = min(w, h)
 im.crop(((w - s) // 2, (h - s) // 2, (w - s) // 2 + s, (h - s) // 2 + s)).resize((1000, 1000)).save(
@@ -85,9 +103,9 @@ page = f'''<!doctype html>
 <meta name="viewport" content="width=1080, height=1920" />
 <script src="assets/gsap.min.js"></script><script src="assets/CustomEase.min.js"></script>
 <style>
-@font-face {{ font-family:"Kaneda"; font-weight:400; src:url("assets/fonts/Kaneda-Regular.otf"); }}
-@font-face {{ font-family:"Kaneda"; font-weight:900; src:url("assets/fonts/Kaneda-Black.otf"); }}
-@font-face {{ font-family:"Kaneda"; font-weight:900; font-style:italic; src:url("assets/fonts/Kaneda-BlackItalic.otf"); }}
+@font-face {{ font-family:"Kaneda"; font-weight:400; src:url("assets/fonts/{FONTS['regular']}"); }}
+@font-face {{ font-family:"Kaneda"; font-weight:900; src:url("assets/fonts/{FONTS['black']}"); }}
+{ITALIC_FACE}
 * {{ margin:0; padding:0; box-sizing:border-box; }}
 html,body {{ width:1080px; height:1920px; overflow:hidden; background:#fff; }}
 #root {{ width:1080px; height:1920px; position:relative; background:#fff; color:#111; overflow:hidden; }}

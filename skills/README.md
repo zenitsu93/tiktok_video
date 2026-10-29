@@ -12,12 +12,12 @@ Ce dossier contient les deux skills de la chaîne et le module de l'intro et de 
 
 ## Tester sur ton PC
 
-Kaneda Gothic n'est pas une police libre, ses fichiers ne sont donc pas dans le dépôt. Mets `Kaneda-Regular.otf`, `Kaneda-Black.otf` et `Kaneda-BlackItalic.otf` dans un dossier, puis lance :
+Les polices Kaneda sont déjà dans le dépôt, dans `brand/fonts/kaneda/`. Il n'y a pas encore de Black Italic : sans elle, le navigateur penche la Black. Pour un vrai italique, ajoute `kaneda-gothic-blackitalic.otf` dans ce dossier. Puis lance :
 
 ```
 pip install pillow
 python skills/pochette/pochette.py --cover pochette.jpg --title "Smooth Operator" --artist "Sade" \
-  --fonts <dossier des polices> \
+  --fonts brand/fonts/kaneda \
   --gsap <node_modules>/hyperframes/dist/vendor/npm/gsap@3.15.0/dist \
   --mode both --out test-pochette
 cd test-pochette && npx hyperframes check && npx hyperframes render --output pochette.mp4
