@@ -369,9 +369,16 @@ function kineticJs(bid: string, b: Beat, t0: number, speak: number): string[] {
 
 const MASCOT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 220" width="100%" height="100%"><circle cx="100" cy="95" r="80" fill="#f2b632"/><ellipse cx="68" cy="95" rx="24" ry="26" fill="#2b1a10"/><ellipse cx="132" cy="95" rx="24" ry="26" fill="#2b1a10"/><circle cx="60" cy="86" r="8" fill="#fff"/><circle cx="124" cy="86" r="8" fill="#fff"/><path d="M40 62 Q60 50 82 60" stroke="#7a4a12" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M118 60 Q140 50 160 62" stroke="#7a4a12" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M88 140 Q100 132 112 140" stroke="#7a4a12" stroke-width="5" fill="none" stroke-linecap="round"/></svg>`;
 
+/** Weights the layouts use; each brand font provides one file per weight (see brandFonts in @regie/server). */
+export const FONT_WEIGHTS = [200, 300, 400, 600, 700] as const;
+/** Kaneda Gothic when its files are installed locally, Oswald otherwise. */
+export type FontName = "kaneda" | "oswald";
+
 export interface DocumentOptions {
-  /** Where gsap.min.js, CustomEase.min.js and the Oswald fonts live ("assets" in a render). */
+  /** Where gsap.min.js, CustomEase.min.js and fonts/brand-{weight}.font live ("assets" in a render). */
   vendorBase: string;
+  /** Which font the brand files are; part of the HTML so a font change re-renders every scene. */
+  font?: FontName;
   duration: number;
   audio?: string;
   extraHead?: string;
@@ -380,9 +387,9 @@ export interface DocumentOptions {
 
 function documentHtml(parts: Parts, o: DocumentOptions): string {
   const v = o.vendorBase.replace(/\/$/, "");
-  const fonts = [200, 300, 400, 600, 700]
-    .map((w) => `@font-face{font-family:"Oswald";font-weight:${w};font-display:block;src:url("${v}/fonts/oswald-${w}.woff2") format("woff2")}`)
-    .join("\n");
+  const fonts =
+    `/* font: ${o.font ?? "oswald"} */\n` +
+    FONT_WEIGHTS.map((w) => `@font-face{font-family:"Brand";font-weight:${w};font-display:block;src:url("${v}/fonts/brand-${w}.font")}`).join("\n");
   const audio = o.audio
     ? `<audio id="vo" src="${esc(o.audio)}" data-start="0" data-duration="${t3(o.duration)}" data-track-index="0"></audio>`
     : "";
@@ -397,7 +404,7 @@ function documentHtml(parts: Parts, o: DocumentOptions): string {
 ${fonts}
 * { margin:0; padding:0; box-sizing:border-box; }
 html, body { width:${W}px; height:${H}px; overflow:hidden; background:#ffffff; }
-#root { width:${W}px; height:${H}px; position:relative; background:#ffffff; color:${INK}; font-family:"Oswald","Arial Narrow",sans-serif; }
+#root { width:${W}px; height:${H}px; position:relative; background:#ffffff; color:${INK}; font-family:"Brand","Arial Narrow",sans-serif; }
 .clip { position:absolute; inset:0; }
 .inner { position:absolute; transform-origin:50% 50%; }
 .card { width:100%; height:100%; border-radius:7%/5.6%; overflow:hidden; }
@@ -446,15 +453,15 @@ ${o.extraBody ?? ""}
 }
 
 /** Standalone HyperFrames project HTML for one scene (times start at 0, no audio). */
-export function sceneDocument(scene: Scene, ctx: ComposeContext, vendorBase = "assets"): string {
-  return documentHtml(sceneParts(scene, ctx, 0), { vendorBase, duration: sceneDuration(scene) });
+export function sceneDocument(scene: Scene, ctx: ComposeContext, vendorBase = "assets", font: FontName = "oswald"): string {
+  return documentHtml(sceneParts(scene, ctx, 0), { vendorBase, font, duration: sceneDuration(scene) });
 }
 
 /** The whole video as one document, for the live preview in the browser. */
 export function previewDocument(
   doc: VideoDoc,
   ctx: ComposeContext,
-  o: { vendorBase: string; audio?: string; extraHead?: string; extraBody?: string },
+  o: { vendorBase: string; font?: FontName; audio?: string; extraHead?: string; extraBody?: string },
 ): string {
   const { scenes, total } = buildScenes(doc);
   const all: Parts = { html: [], js: [] };

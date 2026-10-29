@@ -1,6 +1,6 @@
 import { sceneAssets, type VideoDoc } from "@regie/core";
 import { getAsset, getDb, getSceneRender, recordUsage, saveSceneRender } from "@regie/db";
-import { assetFile, hashedScenes, storage, type HashedScene } from "@regie/server";
+import { assetFile, brandFonts, hashedScenes, storage, type HashedScene } from "@regie/server";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
@@ -13,8 +13,7 @@ import { ff, storeFile, withTemp } from "./media";
 const run = promisify(execFile);
 const require = createRequire(import.meta.url);
 const HERE = dirname(fileURLToPath(import.meta.url));
-const FONTS_DIR = process.env.FONTS_DIR ?? resolve(HERE, "../../../brand/fonts");
-const FONT_WEIGHTS = [200, 300, 400, 600, 700];
+process.env.FONTS_DIR ??= resolve(HERE, "../../../brand/fonts");
 
 function hyperframesBin(): string {
   const pkgPath = require.resolve("hyperframes/package.json");
@@ -31,7 +30,7 @@ async function renderScene(s: HashedScene, doc: VideoDoc, out: string) {
     await mkdir(join(assets, "fonts"), { recursive: true });
     await copyFile(require.resolve("gsap/dist/gsap.min.js"), join(assets, "gsap.min.js"));
     await copyFile(require.resolve("gsap/dist/CustomEase.min.js"), join(assets, "CustomEase.min.js"));
-    for (const w of FONT_WEIGHTS) await copyFile(join(FONTS_DIR, `oswald-${w}.woff2`), join(assets, "fonts", `oswald-${w}.woff2`));
+    for (const [w, file] of Object.entries(brandFonts().files)) await copyFile(file, join(assets, "fonts", `brand-${w}.font`));
     for (const id of sceneAssets(s.scene)) {
       const meta = doc.assets[id];
       const row = await getAsset(getDb(), id);

@@ -1,5 +1,6 @@
 import { buildScenes, sceneAssets, sceneDocument, type Asset, type ComposeContext, type Scene, type VideoDoc } from "@regie/core";
 import { createHash } from "node:crypto";
+import { brandFonts } from "./fonts";
 
 /** Bump when the renderer itself changes, so cached clips are not reused. */
 export const RENDERER_VERSION = "hf-0.8.214/1";
@@ -29,11 +30,12 @@ export interface HashedScene {
  */
 export function hashedScenes(doc: VideoDoc): { scenes: HashedScene[]; total: number } {
   const ctx = renderContext(doc);
+  const font = brandFonts().name;
   const { scenes, total } = buildScenes(doc);
   return {
     total,
     scenes: scenes.map((scene) => {
-      const html = sceneDocument(scene, ctx);
+      const html = sceneDocument(scene, ctx, "assets", font);
       const hash = createHash("sha256").update(RENDERER_VERSION).update(html).update(sceneAssets(scene).join(",")).digest("hex").slice(0, 32);
       return { scene, html, hash };
     }),
