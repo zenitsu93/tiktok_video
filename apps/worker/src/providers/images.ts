@@ -1,0 +1,101 @@
+import { getDb, recordUsage } from "@regie/db";
+import { assertBudget, env, PRICES } from "@regie/server";
+
+/**
+ * Image downloads only go to these hosts, over HTTPS, with a size cap.
+ * A URL found in a scraped result can never make the worker call anything else.
+ */
+const ALLOWED_HOSTS = [/^i\.pinimg\.com$/, /^([a-z0-9-]+\.)?dzcdn\.net$/];
+const MAX_BYTES = 15 * 1024 * 1024;
+
+export function allowedImageUrl(raw: string): URL | null {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "https:" || u.username || u.password || (u.port && u.port !== "443")) return null;
+  return ALLOWED_HOSTS.some((h) => h.test(u.hostname)) ? u : null;
+}
+
+export async function fetchImage(raw: string): Promise<Buffer> {
+  let url = allowedImageUrl(raw);
+  for (let hop = 0; hop < 3 && url; hop++) {
+    const res = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(20_000), headers: { accept: "image/*" } });
+    if (res.status >= 300 && res.status < 400) {
+      url = allowedImageUrl(new URL(res.headers.get("location") ?? "", url).toString());
+      continue;
+    }
+    if (!res.ok) throw new Error(`image ${res.status}`);
+    const type = res.headers.get("content-type") ?? "";
+    if (!type.startsWith("image/")) throw new Error(`type refusé : ${type}`);
+    const len = Number(res.headers.get("content-length") ?? 0);
+    if (len > MAX_BYTES) throw new Error("image trop lourde");
+    const reader = res.body!.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.length;
+      if (total > MAX_BYTES) {
+        await reader.cancel();
+        throw new Error("image trop lourde");
+      }
+      chunks.push(value);
+    }
+    return Buffer.concat(chunks);
+  }
+  throw new Error("adresse d'image refusée");
+}
+
+/** Finds the largest pinimg URL anywhere in a scraped item, whatever the actor's field names. */
+export function pinUrls(item: unknown): string[] {
+  const found: string[] = [];
+  const walk = (v: unknown, depth: number) => {
+    if (depth > 5 || v == null) return;
+    if (typeof v === "string") {
+      if (/^https:\/\/i\.pinimg\.com\//.test(v)) found.push(v);
+    } else if (Array.isArray(v)) v.forEach((x) => walk(x, depth + 1));
+    else if (typeof v === "object") Object.values(v as Record<string, unknown>).forEach((x) => walk(x, depth + 1));
+  };
+  walk(item, 0);
+  const rank = (u: string) => (u.includes("/originals/") ? 4000 : Number(/\/(\d+)x\//.exec(u)?.[1] ?? 0));
+  return [...new Set(found)].sort((a, b) => rank(b) - rank(a));
+}
+
+/** Pinterest search through the Apify actor; returns the best image URL of each pin. */
+export async function searchPinterest(videoId: string, query: string, limit: number): Promise<string[]> {
+  await assertBudget(videoId);
+  const e = env();
+  const res = await fetch(
+    `https://api.apify.com/v2/acts/${encodeURIComponent(e.APIFY_PINTEREST_ACTOR)}/run-sync-get-dataset-items?timeout=120&clean=true`,
+    {
+      method: "POST",
+      headers: { authorization: `Bearer ${e.APIFY_TOKEN}`, "content-type": "application/json" },
+      body: JSON.stringify({ searchQueries: [query], maxItems: limit, maxResults: limit }),
+      signal: AbortSignal.timeout(150_000),
+    },
+  );
+  if (!res.ok) throw new Error(`Apify a répondu ${res.status} : ${(await res.text()).slice(0, 300)}`);
+  const items = (await res.json()) as unknown[];
+  await recordUsage(getDb(), {
+    videoId,
+    provider: "apify",
+    operation: "recherche Pinterest",
+    units: { results: items.length },
+    costUsd: (items.length * PRICES.apifyPerResult).toFixed(5),
+  });
+  return items.map((it) => pinUrls(it)[0]).filter((u): u is string => Boolean(u));
+}
+
+/** Album cover from Deezer's public API (no key), 1000 px. */
+export async function deezerCover(title: string, artist: string): Promise<string | null> {
+  const q = encodeURIComponent(`artist:"${artist}" track:"${title}"`);
+  const res = await fetch(`https://api.deezer.com/search?q=${q}&limit=1`, { signal: AbortSignal.timeout(15_000) });
+  if (!res.ok) return null;
+  const body = (await res.json()) as { data?: { album?: { cover_xl?: string } }[] };
+  const url = body.data?.[0]?.album?.cover_xl ?? null;
+  return url && allowedImageUrl(url) ? url : null;
+}
