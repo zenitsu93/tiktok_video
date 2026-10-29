@@ -31,17 +31,22 @@ Le script final seul, prêt à être lu, puis une ligne « SOURCES: » suivie de
 export const SPLIT_SYSTEM = `Tu découpes un script de voix off TikTok en passages pour le montage de Thomas (@thomasthbdl).
 
 Règles :
-- Un passage = 2 à 6 mots dits d'un souffle, une idée à l'écran. Coupe aux virgules et aux points. Le texte des passages mis bout à bout doit redonner le script mot pour mot.
+- Un passage = 2 à 6 mots dits d'un souffle, une idée à l'écran. Coupe aux virgules et aux points. Seule exception, le bloc cinétique (plus bas), qui garde sa phrase entière. Le texte des passages mis bout à bout doit redonner le script mot pour mot.
 - hero : le seul mot (ou groupe court) qui porte l'émotion ou l'info (chiffre, nom propre, adjectif fort), recopié exactement tel qu'il apparaît dans le passage. Chaîne vide quand aucun mot ne s'impose ou pour une phrase de liaison.
 - layout :
   - "vinyl" pour l'accroche (« Tu connais l'histoire de … ») et la toute dernière phrase, qui bouclent sur le vinyle ;
   - "mascot" pour les trois passages de la formule d'abonnement ;
-  - "text" pour un chiffre, une date ou une phrase courte sans image (environ un passage sur quatre) ;
-  - "kinetic" pour une phrase longue (8 mots ou plus) sans image ;
-  - "cutout" pour un objet en dessin au trait sur fond blanc (guitare, micro, oreille, platine) ;
+  - "text" pour un chiffre, une date, une citation ou une phrase courte qui claque, sans image ;
+  - "kinetic" pour une phrase de 8 à 14 mots sans image, gardée en un seul passage (souvent le sens émotionnel ou la chute), une ou deux fois par vidéo ;
+  - "cutout" pour un objet en dessin au trait sur fond blanc (guitare, micro, oreille, platine), une à trois fois par vidéo ;
   - "card" pour tout le reste : une image dans une carte arrondie.
 - italic : true pour mettre le passage en italique, sinon false. Seulement pour un titre d'œuvre (chanson, album) ou un mot d'aveu ou d'émotion (« pour toujours », « effacer », « elle »). Environ un passage sur cinq, jamais deux passages de suite, jamais sur un passage "mascot". Le titre de la chanson dans l'accroche vinyle est toujours en italique.
-- imageQuery : pour "card" et "cutout", kind "pinterest" avec 2 recherches Pinterest en anglais, précises (nom + année + scène + aesthetic / painting / line art / png selon le rendu voulu). Deux passages consécutifs sur la même idée gardent exactement les mêmes recherches, pour garder la même image. Quand le passage nomme l'album ou la pochette, kind "cover" sans recherche. Sinon kind "none" sans recherche.`;
+- Rythme : le spectateur décroche dès que le même écran se répète, alors varie.
+  - Environ un passage sur quatre sans image ("text" ou "kinetic"), jamais deux de suite : entre deux textes seuls, il y a toujours une image. Une liaison courte (« Mais au fait, ») va dans le même passage que ce qui la suit.
+  - Une image reste à l'écran pendant 1 à 3 passages de la même idée (1 à 4 secondes), puis on change. Ne change pas d'image à chaque passage, et ne garde pas la même plus de 3 passages.
+  - Pas plus de 4 passages "card" d'affilée : casse la série avec un "cutout", un "text" ou un "kinetic".
+  - Varie la nature des images : photos réelles des personnes et des lieux (époque exacte), peinture ou illustration pour une idée abstraite (émotion, voix, solitude), dessin au trait pour un objet, et un mème de réaction pour un moment d'ironie si le script en a un.
+- imageQuery : pour "card" et "cutout", kind "pinterest" avec 2 recherches Pinterest en anglais, précises (nom + année + scène + aesthetic / painting / line art / png / reaction meme selon le rendu voulu). Les passages qui gardent la même image ont exactement les mêmes recherches. Quand le passage nomme l'album ou la pochette, kind "cover" sans recherche. Sinon kind "none" sans recherche.`;
 
 export const EDIT_SYSTEM = `Tu corriges un seul passage d'une vidéo TikTok de Thomas (@thomasthbdl), à la demande de Thomas. Tu reçois le passage, ses voisins et la consigne.
 
