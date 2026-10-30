@@ -1,14 +1,14 @@
 "use client";
 
 import { ENTRANCE_LABELS, ENTRANCES, LAYOUT_LABELS, LAYOUTS, type BeatPatch } from "@regie/core";
-import { ArrowLeft, Download, Hand, Image as ImageIcon, ImagePlus, LayoutGrid, Library, List, Loader2, Maximize2, Mic, Minimize2, Pause, Play, RotateCcw, Scissors, Send, Sparkles, Undo2, Wand2 } from "lucide-react";
+import { ArrowLeft, Download, Hand, Image as ImageIcon, ImagePlus, LayoutGrid, Library, List, Loader2, Maximize2, Mic, Minimize2, Pause, Play, RotateCcw, Scissors, Search, Send, Sparkles, Undo2, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BeatView, VideoView } from "@/lib/view";
 import { Caption } from "./caption";
 import { DeleteVideo } from "./delete-video";
 import { Lecture } from "./lecture";
-import { ShelfSearch } from "./library";
+import { bestFromShelf, putFromShelf, ShelfSearch, useLibrary } from "./library";
 import { Planche } from "./planche";
 import { PronounceWords, type Notify } from "./pronunciations";
 import { TikTokSend, tiktokMoving } from "./tiktok-send";
@@ -765,6 +765,13 @@ function Inspector({
   };
   const [drag, setDrag] = useState(false);
   const [shelf, setShelf] = useState(false);
+  const shelfItems = useLibrary();
+  // « Ma bibliothèque » : the kept picture that fits this line goes on it, or nothing does (free, no Pinterest)
+  const fromShelf = () => {
+    const best = bestFromShelf(shelfItems, v, b.queries.length ? b.queries : [b.hero || b.text]);
+    if (!best) return notify.flash("Rien dans ta bibliothèque pour cette image.");
+    void putFromShelf(v, [b.id], best, notify);
+  };
   // « Ma photo »: the file goes as it is, the worker cleans it and shows it on this line
   async function upload(f: File) {
     if (f.size > 9_500_000) return notify.flash("Fichier trop lourd (9 Mo au plus).", true);
@@ -915,11 +922,14 @@ function Inspector({
           </div>
         )}
         <div className="chips">
-          <button className="btn sm" disabled={busy} onClick={() => action("images", undefined, "Recherche d'autres images…")}>
+          <button className="btn sm" disabled={busy} onClick={() => action("images", undefined, "Recherche d'autres images…")} title="Nouvelle recherche Pinterest (Apify, payante)">
             <ImageIcon size={14} /> Autres images
           </button>
-          <button className="btn sm" aria-expanded={shelf} disabled={busy} onClick={() => setShelf((o) => !o)} title="Les images gardées sur tes autres vidéos : gratuit">
-            <Library size={14} /> Bibliothèque
+          <button className="btn sm" disabled={busy || !shelfItems?.length} onClick={fromShelf} title="Cherche dans tes images gardées et pose celle qui va, sinon rien. Gratuit.">
+            <Library size={14} /> Ma bibliothèque
+          </button>
+          <button className="btn sm" aria-expanded={shelf} disabled={busy} onClick={() => setShelf((o) => !o)} title="Parcourir toutes tes images gardées et choisir toi-même">
+            <Search size={14} /> Parcourir
           </button>
           <label className={`btn sm${busy ? " off" : ""}`} title="Ta propre image, un GIF ou une courte vidéo, depuis ton ordinateur ou ton téléphone (ou glisse-le ici)">
             <ImagePlus size={14} /> Ma photo
