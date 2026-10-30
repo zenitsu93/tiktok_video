@@ -330,3 +330,8 @@ body.resizing iframe { pointer-events: none; }
 .say-pop .r { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .say-pop .field { flex: 1; min-width: 0; font-size: 14px; padding: 6px 10px; border-radius: 8px; }
 .say-pop .field:first-child { flex: 0 1 38%; }
+
+/* « Ma photo »: an image dropped on the Image group */
+.insp .grp.drop { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 8px; }
+label.btn.off { opacity: 0.5; pointer-events: none; }
+button.chip { cursor: pointer; border: 0; font-family: inherit; }

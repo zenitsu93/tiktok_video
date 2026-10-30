@@ -10,6 +10,8 @@ export const JOBS = {
   voice: "beat-voice",
   /** New image candidates for one beat. */
   images: "beat-images",
+  /** An image Thomas brought himself, for one beat. */
+  upload: "beat-upload",
   /** Cut the background out of one beat's image. */
   clean: "beat-clean",
   /** Rewrite the whole script with Claude, before it is approved. */
@@ -33,6 +35,7 @@ export const jobData = {
   [JOBS.voice]: z.object({ videoId: z.string().uuid(), beatId: z.string() }),
   [JOBS.images]: z.object({ videoId: z.string().uuid(), beatId: z.string(), instruction: z.string().max(500).optional() }),
   [JOBS.clean]: z.object({ videoId: z.string().uuid(), beatId: z.string() }),
+  [JOBS.upload]: z.object({ videoId: z.string().uuid(), beatId: z.string(), key: z.string().regex(/^uploads\/[0-9a-f-]{36}$/) }),
   [JOBS.script]: z.object({ videoId: z.string().uuid(), instruction: z.string().min(1).max(1000) }),
   [JOBS.rewrite]: z.object({ videoId: z.string().uuid(), beatId: z.string(), instruction: z.string().min(1).max(500) }),
   [JOBS.render]: z.object({ videoId: z.string().uuid() }),

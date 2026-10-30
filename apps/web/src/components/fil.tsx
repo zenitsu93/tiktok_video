@@ -1,14 +1,14 @@
 "use client";
 
 import { ENTRANCE_LABELS, ENTRANCES, LAYOUT_LABELS, LAYOUTS, type BeatPatch } from "@regie/core";
-import { ArrowLeft, Download, Image as ImageIcon, Loader2, Maximize2, Mic, Minimize2, Pause, Play, RotateCcw, Scissors, Send, Sparkles, Undo2, Wand2 } from "lucide-react";
+import { ArrowLeft, Download, Image as ImageIcon, ImagePlus, Loader2, Maximize2, Mic, Minimize2, Pause, Play, RotateCcw, Scissors, Send, Sparkles, Undo2, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BeatView, VideoView } from "@/lib/view";
 import { Caption } from "./caption";
 import { DeleteVideo } from "./delete-video";
 import { Lecture } from "./lecture";
-import { PronounceWords, type Lexicon } from "./pronunciations";
+import { PronounceWords, type Notify } from "./pronunciations";
 import { TikTokSend, tiktokMoving } from "./tiktok-send";
 import { StatusChip } from "./status";
 import { chime, Fan, Grooves, LineBusy, Platine, Sleeve, stageOf } from "./waits";
@@ -119,8 +119,8 @@ export function Fil({ initial }: { initial: VideoView }) {
     } catch {}
   }, [url]);
 
-  // a pronunciation changed: the revoiced lines come back within seconds
-  const lexicon: Lexicon = {
+  // a line changed on the worker's side (pronunciation, own image): it comes back within seconds
+  const notify: Notify = {
     flash,
     onChange: () => {
       setEager(Date.now() + 15_000);
@@ -348,6 +348,8 @@ export function Fil({ initial }: { initial: VideoView }) {
   const voiceMissing = v.beats.some((b) => b.voiceStale);
   // the montage only once the voice is approved and the images are there
   const canRender = v.beats.length > 0 && v.status !== "generating" && v.status !== "rendering" && v.status !== "listen";
+  // lines that need a picture and have none (the search failed, or the budget ran out)
+  const missing = v.beats.filter((b) => !b.image && (b.layout === "card" || b.layout === "cutout"));
   const upToDate = Boolean(v.download) && v.dirty.length === 0 && !voiceMissing;
 
   // the script waits to be read and approved before anything paid is spent
@@ -380,6 +382,19 @@ export function Fil({ initial }: { initial: VideoView }) {
           <div className="meta">
             <StatusChip status={v.status}>{v.total > 0 && <span className="mono">{tc(v.total)}</span>}</StatusChip>
             {v.angle && <span className="chip">angle : {v.angle}</span>}
+            {missing.length > 0 && (
+              <button
+                className="chip warn"
+                onClick={() => {
+                  choose(missing[0]!);
+                  document.getElementById(`beat-${missing[0]!.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                }}
+                title={`Plans sans image : ${missing.map((b) => b.id).join(", ")}. Clique pour aller au premier, puis « Ma photo ».`}
+              >
+                <span className="dot" />
+                {missing.length} {missing.length > 1 ? "plans sans image" : "plan sans image"} → {missing[0]!.id}
+              </button>
+            )}
             {v.download && v.dirty.length > 0 && (
               <span className="chip hot">
                 <span className="dot" />
@@ -517,7 +532,7 @@ export function Fil({ initial }: { initial: VideoView }) {
               job={jobs[b.id]}
               patch={(p, ok) => patch(b.id, p, ok)}
               action={(a, i, ok) => action(b.id, a, i, ok)}
-              lexicon={lexicon}
+              notify={notify}
             />
           ))}
         </div>
@@ -630,7 +645,7 @@ function BeatRow({
   onChoose,
   patch,
   action,
-  lexicon,
+  notify,
 }: {
   b: BeatView;
   v: VideoView;
@@ -640,7 +655,7 @@ function BeatRow({
   onChoose: () => void;
   patch: (p: BeatPatch, ok?: string) => void;
   action: (a: "images" | "clean" | "voice" | "rewrite", instruction?: string, ok?: string) => void;
-  lexicon: Lexicon;
+  notify: Notify;
 }) {
   const img = b.image ? v.images[b.image] : b.layout === "vinyl" && v.cover ? v.images[v.cover] : undefined;
   const busy = v.busy.includes(b.id) || Boolean(job);
@@ -674,7 +689,7 @@ function BeatRow({
           )}
         </span>
       </button>
-      {selected && <Inspector b={b} v={v} busy={busy} job={job} patch={patch} action={action} lexicon={lexicon} />}
+      {selected && <Inspector b={b} v={v} busy={busy} job={job} patch={patch} action={action} notify={notify} />}
     </div>
   );
 }
@@ -686,7 +701,7 @@ function Inspector({
   job,
   patch,
   action,
-  lexicon,
+  notify,
 }: {
   b: BeatView;
   v: VideoView;
@@ -694,7 +709,7 @@ function Inspector({
   job?: Job;
   patch: (p: BeatPatch, ok?: string) => void;
   action: (a: "images" | "clean" | "voice" | "rewrite", instruction?: string, ok?: string) => void;
-  lexicon: Lexicon;
+  notify: Notify;
 }) {
   const [text, setText] = useState(b.text);
   useEffect(() => setText(b.text), [b.text]);
@@ -705,6 +720,20 @@ function Inspector({
     action("rewrite", ask.trim(), "Claude retouche la phrase…");
     setAsk(null);
   };
+  const [drag, setDrag] = useState(false);
+  // « Ma photo »: the file goes as it is, the worker cleans it and shows it on this line
+  async function upload(f: File) {
+    if (f.size > 9_500_000) return notify.flash("Image trop lourde (9 Mo au plus).", true);
+    try {
+      const r = await fetch(`/api/videos/${v.id}/beats/${b.id}/image`, { method: "POST", headers: { "content-type": f.type }, body: f });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error ?? `Erreur ${r.status}`);
+      notify.flash("Ta photo arrive sur ce plan");
+      notify.onChange();
+    } catch (e) {
+      notify.flash(e instanceof Error ? e.message : "Envoi impossible", true);
+    }
+  }
   const words = b.text.split(/\s+/).map((w) => w.replace(/^[«"“(]+|[.,;:!?…»"”)]+$/g, "")).filter(Boolean);
   const changed = text.trim() !== b.text;
   const imageLayouts = b.layout === "card" || b.layout === "cutout";
@@ -744,7 +773,7 @@ function Inspector({
 
       <div className="grp">
         <span className="lab">Prononciation · clique un mot</span>
-        <PronounceWords b={b} v={v} words={words} lexicon={lexicon} />
+        <PronounceWords b={b} v={v} words={words} notify={notify} />
       </div>
 
       <div className="grp">
@@ -758,7 +787,22 @@ function Inspector({
         </div>
       </div>
 
-      <div className="grp">
+      <div
+        className={`grp${drag ? " drop" : ""}`}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes("Files")) {
+            e.preventDefault();
+            setDrag(true);
+          }
+        }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDrag(false);
+          const f = e.dataTransfer.files[0];
+          if (f) void upload(f);
+        }}
+      >
         <span className="lab">Image</span>
         {job?.kind === "images" && <Fan query={job.query} />}
         {b.candidates.length > 0 && (
@@ -824,6 +868,20 @@ function Inspector({
           <button className="btn sm" disabled={busy} onClick={() => action("images", undefined, "Recherche d'autres images…")}>
             <ImageIcon size={14} /> Autres images
           </button>
+          <label className={`btn sm${busy ? " off" : ""}`} title="Ta propre image, depuis ton ordinateur ou ton téléphone (ou glisse-la ici)">
+            <ImagePlus size={14} /> Ma photo
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              hidden
+              disabled={busy}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) void upload(f);
+              }}
+            />
+          </label>
           {b.queries.length > 0 && <span className="mute" style={{ fontSize: 13, alignSelf: "center" }}>« {b.queries.join(" », « ")} »</span>}
         </div>
       </div>
