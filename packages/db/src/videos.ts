@@ -128,14 +128,32 @@ export async function deleteVideo(db: Db, id: string): Promise<string[]> {
       .delete(assets)
       .where(and(sql`${assets.id} not in ${used}`, ownIds.length ? or(inArray(assets.id, ownIds), old) : old))
       .returning({ key: assets.storageKey });
-    const scenes = row.scenes.length
-      ? await tx
-          .delete(sceneRenders)
-          .where(and(inArray(sceneRenders.hash, row.scenes), sql`not exists (select 1 from ${videos} where ${videos.renderedScenes} ? ${sceneRenders.hash})`))
-          .returning({ key: sceneRenders.storageKey })
-      : [];
+    // its last export's scenes, and every scene made for it (ahead of time, or for an older export)
+    const mine = row.scenes.length ? or(inArray(sceneRenders.hash, row.scenes), eq(sceneRenders.videoId, id)) : eq(sceneRenders.videoId, id);
+    const scenes = await tx
+      .delete(sceneRenders)
+      .where(and(mine, sql`not exists (select 1 from ${videos} where ${videos.renderedScenes} ? ${sceneRenders.hash})`))
+      .returning({ key: sceneRenders.storageKey });
     return [...files, ...scenes].map((f) => f.key);
   });
+}
+
+/**
+ * Scene clips no video uses any more: made for a video since deleted (or before scenes knew
+ * their video), and in no video's last export. A day old at least, so a render in progress is never taken.
+ */
+export async function deleteOrphanScenes(db: Db): Promise<string[]> {
+  const rows = await db
+    .delete(sceneRenders)
+    .where(
+      and(
+        lt(sceneRenders.createdAt, sql`now() - interval '1 day'`),
+        sql`(${sceneRenders.videoId} is null or not exists (select 1 from ${videos} where ${videos.id} = ${sceneRenders.videoId}))`,
+        sql`not exists (select 1 from ${videos} where ${videos.renderedScenes} ? ${sceneRenders.hash})`,
+      ),
+    )
+    .returning({ key: sceneRenders.storageKey });
+  return rows.map((r) => r.key);
 }
 
 // ---- assets and render cache
@@ -154,8 +172,8 @@ export async function getSceneRender(db: Db, hash: string) {
   return r;
 }
 
-export async function saveSceneRender(db: Db, hash: string, storageKey: string) {
-  await db.insert(sceneRenders).values({ hash, storageKey }).onConflictDoNothing();
+export async function saveSceneRender(db: Db, hash: string, storageKey: string, videoId: string) {
+  await db.insert(sceneRenders).values({ hash, storageKey, videoId }).onConflictDoNothing();
 }
 
 // ---- spending

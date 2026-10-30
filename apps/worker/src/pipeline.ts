@@ -328,7 +328,7 @@ export async function generate(videoId: string) {
 export async function prerender(videoId: string) {
   const start = await load(videoId);
   if (start.status !== "ready" || start.doc.beats.some((b) => !b.voice)) return;
-  const n = await prerenderScenes(start.doc, async () => {
+  const n = await prerenderScenes(videoId, start.doc, async () => {
     const now = await load(videoId);
     return now.status === "ready" && now.version === start.version;
   });

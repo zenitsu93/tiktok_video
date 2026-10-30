@@ -64,6 +64,8 @@ export const assets = pgTable("assets", {
 export const sceneRenders = pgTable("scene_renders", {
   hash: text("hash").primaryKey(),
   storageKey: text("storage_key").notNull(),
+  /** The video it was made for, so deleting the video takes its scenes too (made ahead or from an older export). */
+  videoId: uuid("video_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
