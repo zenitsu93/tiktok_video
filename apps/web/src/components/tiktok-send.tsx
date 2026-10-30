@@ -55,12 +55,18 @@ export function TikTokSend({ v, onQueued, flash }: { v: VideoView; onQueued: () 
         className={`btn dark sm tiktok-send ${stage}`}
         disabled={!v.download || moving || sent}
         onClick={go}
-        title={v.download ? "Envoie le dernier export dans ta boîte TikTok, sans musique" : "Exporte d'abord le MP4"}
+        title={
+          stage === "processing"
+            ? "Le fichier est chez TikTok. TikTok le prépare de son côté : de 30 s à plus de 10 min selon les fois. Tu peux fermer la page."
+            : v.download
+              ? "Envoie le dernier export dans ta boîte TikTok, sans musique"
+              : "Exporte d'abord le MP4"
+        }
       >
         <span className="fill" aria-hidden />
         {stage === "sending" || stage === "processing" ? (
           <>
-            <Disc size={16} /> {stage === "sending" ? "Envoi…" : "TikTok prépare…"}
+            <Disc size={16} /> {stage === "sending" ? "Envoi…" : "Reçue · TikTok la prépare…"}
           </>
         ) : sent ? (
           <>
