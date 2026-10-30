@@ -156,6 +156,13 @@ export async function editBeat(videoId: string, ctx: { before: string[]; target:
 
 const captionSchema = z.object({ caption: z.string() });
 
+/** Thomas wants exactly three hashtags: the first three kept, on their own last line. */
+export function threeTags(caption: string): string {
+  const tags = [...new Set(caption.match(/#[\p{L}\p{N}_]+/gu) ?? [])].slice(0, 3);
+  const text = caption.replace(/#[\p{L}\p{N}_]+/gu, "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  return tags.length ? `${text}\n${tags.join(" ")}` : text;
+}
+
 export async function writeCaption(videoId: string, song: { title: string; artist: string }, script: string) {
   await assertBudget(videoId);
   const msg = await api().beta.messages.parse({
@@ -172,5 +179,5 @@ export async function writeCaption(videoId: string, song: { title: string; artis
   checkStop(msg.stop_reason, "la légende");
   const caption = msg.parsed_output?.caption.trim();
   if (!caption) throw new Error("La légende reçue est vide.");
-  return caption.slice(0, 2200);
+  return threeTags(caption).slice(0, 2200);
 }
