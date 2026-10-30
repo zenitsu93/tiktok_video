@@ -4,7 +4,7 @@ Ce dossier contient les deux skills de la chaîne et le module de l'intro et de 
 
 - `montage-tiktok-thomas/SKILL.md` : le style de montage (police Kaneda, graisses, italiques, mouvements, courbes de vitesse).
 - `histoire-chanson-thomas/SKILL.md` : l'écriture du script en voix off.
-- `pochette/` : l'intro et la sortie vinyle + pochette, la même pour toutes les chansons.
+- `pochette/` : la couverture « bac à disques » (frame 0 utilisable comme cover TikTok, même image à la fin pour la boucle), avec la sortie, la même pour toutes les chansons.
   - `pochette.py` génère la composition HyperFrames à partir de la pochette, du titre et de l'artiste.
   - `SPEC.md` donne les temps, les courbes, les positions et la règle des italiques.
   - `exemple-index.html` est le résultat pour *Smooth Operator* de Sade.
