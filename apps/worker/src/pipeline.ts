@@ -389,7 +389,17 @@ export async function render(videoId: string) {
   const row = await load(videoId);
   if (row.doc.beats.some((b) => !b.voice)) throw new Error("Toutes les phrases n'ont pas encore de voix.");
   await setStatus(db(), videoId, "rendering", { step: "Montage", done: 0, total: 1 });
-  const res = await exportVideo(videoId, row.doc, (done, total) => setProgress(db(), videoId, { step: "Montage des plans", done, total }));
+  // a line whose reading changed since its voice (a pronunciation added on another video…) is voiced again first,
+  // so the export never carries the old reading
+  const lexicon = await pronunciationLexicon(db());
+  const stale = row.doc.beats.filter((b) => voiceStale(b, lexicon));
+  for (const [k, b] of stale.entries()) {
+    await setProgress(db(), videoId, { step: "Voix à refaire", done: k, total: stale.length });
+    await voiceBeat(videoId, b.id, false);
+  }
+  if (stale.length) await remixVoice(videoId);
+  const doc = stale.length ? (await load(videoId)).doc : row.doc;
+  const res = await exportVideo(videoId, doc, (done, total) => setProgress(db(), videoId, { step: "Montage des plans", done, total }));
   await setRendered(db(), videoId, res.asset.id, res.hashes);
   await setStatus(db(), videoId, "ready");
   console.log(`[render] ${videoId}: ${res.rendered}/${res.total} scènes rendues, le reste venait du cache`);
