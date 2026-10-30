@@ -165,7 +165,7 @@ export function Planche({ v, notify, onSearch }: { v: VideoView; notify: Notify;
         )}
         {Boolean(shelfItems?.length) && (
           <button className="btn sm" aria-expanded={shelf} onClick={() => setShelf((o) => !o)} title="Les images gardées sur tes autres vidéos : gratuit">
-            <Library size={14} /> Bibliothèque · {shelfItems!.length}
+            <Search size={14} /> Parcourir ma bibliothèque · {shelfItems!.length}
           </button>
         )}
         {left.length > 1 && (
