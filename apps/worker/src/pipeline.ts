@@ -305,21 +305,22 @@ export async function generate(videoId: string) {
   );
   // a video without its images must not go out as a wall of text: stop before the export,
   // and « Reprendre » fetches only the missing ones
+  let notice: string | null = null;
   if (failed.length) {
     const found = new Set((await load(videoId)).doc.beats.filter((b) => b.candidates.length).map((b) => b.id));
     const missing = todo.filter((g) => !g.some((id) => found.has(id)));
     const first = failed.find((f) => f.error instanceof BudgetError) ?? failed[0]!;
-    // over budget, Thomas can still finish the video with his own pictures, which cost nothing
-    const own = first.error instanceof BudgetError ? " Tu peux mettre tes propres images avec « Ma photo » dans ces plans, puis cliquer sur « Reprendre »." : "";
-    const message = `Pas d'images pour ${missing.length} ${missing.length > 1 ? "idées" : "idée"}, à partir de ${missing[0]?.[0] ?? first.beats[0]}. ${first.error.message}${own}`;
-    throw first.error instanceof BudgetError ? new BudgetError(message) : new Error(message);
+    const message = `Pas d'images pour ${missing.length} ${missing.length > 1 ? "idées" : "idée"}, à partir de ${missing[0]?.[0] ?? first.beats[0]}. ${first.error.message}`;
+    if (!(first.error instanceof BudgetError)) throw new Error(message);
+    // over budget the video is not stuck: Thomas puts his own pictures on those lines (free), then mounts it
+    notice = `${message} Mets tes propres images avec « Ma photo » dans ces plans, puis « Monter la vidéo ».`;
   }
   if (!(await load(videoId)).doc.cover) await coverFor(videoId);
   // a caption that fails does not hold the video back: the « Écrire la légende » button retries it
   if (!(await load(videoId)).doc.caption) await caption(videoId).catch((e) => console.warn("[légende]", (e as Error).message));
   // the montage waits for Thomas too: he checks the shots, then « Monter la vidéo » (which then goes to TikTok);
   // meanwhile the scenes are made ahead, so that click has little left to do
-  await setStatus(db(), videoId, "ready");
+  await setStatus(db(), videoId, "ready", null, notice);
   await enqueue(JOBS.prerender, { videoId });
 }
 
