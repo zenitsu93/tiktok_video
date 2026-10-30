@@ -15,14 +15,14 @@ Les valeurs ci-dessous ont été mesurées image par image sur 25 vidéos de ré
 
 1. **La voix off** (mp3/wav/m4a, ou une vidéo dont on garde le son). Obligatoire : tout le timing en découle.
 2. **Les illustrations** : un dossier d'images, GIF ou extraits vidéo (souvent pris sur Pinterest, des clips, des pochettes d'album). Si elles sont numérotées ou nommées par mot-clé, respecte cet ordre ; sinon associe chaque image au passage du texte qui lui correspond et dis quelle association tu as faite.
-3. **Le titre du morceau et l'artiste** pour l'intro et l'outro.
+3. **Le titre du morceau et l'artiste** pour la couverture et l'outro.
 4. **Les polices** : Kaneda Gothic n'est pas une police libre. Demande les fichiers (Light, Regular, Medium, Bold, ExtraBold, Black, plus les italiques Light, Regular, Bold et Black, en .otf/.ttf/.woff2) à placer dans `assets/fonts/`, et déclare **une seule famille `Kaneda` avec un `@font-face` par graisse** (300, 400, 500, 700, 800, 900, et `font-style: italic` pour 300, 400, 700, 900) pour que `font-weight` choisisse le bon fichier. N'utilise jamais une police de remplacement en silence : sans les fichiers, dis-le avant de rendre (repli League Gothic + Oswald 300, rendu seulement proche).
 
 ## Format et grille
 
 - Projet : `npx hyperframes init <dossier>`, racine en **1080×1920, 30 i/s**, `data-duration` = durée exacte de la voix off (ffprobe).
 - **Fond blanc pur `#FFFFFF`** sur toute la vidéo. Jamais de dégradé, de texture ni de fond coloré. Le blanc est le personnage principal du style : entre deux idées l'écran redevient blanc.
-- Une seule « scène » visuelle à la fois, centrée horizontalement, empilée verticalement : une carte image + une ligne de texte au-dessus ou en dessous. Le bloc entier tient dans la bande 300–1350 px (zone sûre TikTok), centre optique vers y ≈ 790 px (41 % de la hauteur).
+- Une seule « scène » visuelle à la fois : une carte image + une ligne de texte au-dessus, en dessous ou à côté. Par défaut le bloc est centré horizontalement, centre optique vers y ≈ 790 px (41 % de la hauteur), dans la bande 300–1350 px (zone sûre TikTok). Environ un écran sur trois sort du centre (voir « Placement libre » plus bas).
 - Rien sous la ligne y = 1350 sauf la fin d'un bloc de texte.
 
 ## La carte image (élément central)
@@ -49,7 +49,7 @@ Les valeurs ci-dessous ont été mesurées image par image sur 25 vidéos de ré
   - la ponctuation qui suit le héros reste collée à lui ; un mot ne se coupe jamais (chaque mot dans un `inline-block` `nowrap`).
 - Bloc de texte **aligné à gauche, calé sur le bord gauche de la carte image** quand il y en a une (même colonne pour l'image et le texte) ; centré sur l'écran pour un texte seul ou sous un détourage. Interligne serré (0.86–1.0).
 - **Couleur d'accent** : le mot héros prend parfois (≈ 1 groupe sur 4) une couleur **prélevée dans l'image affichée** (rose poudré pour un tableau rose, bleu nuit pour une image bleue, ocre pour une image dorée, rouge pour « Blood »), assombrie si besoin pour rester lisible sur blanc (contraste ≥ 4.5:1). Jamais de couleur hors palette de l'image.
-- **Lignes « parlées » (abonnement, titre, accroche)** : pas de graisse partout. Une ligne en **Regular 400**, et seul le mot clé passe en **Black 900**, même famille et même taille, dans la même ligne (≈ 68 px) : « alors **abonne-toi** pour la suite, », « ça me soutient **énormément**. », « Je raconte l'histoire derrière vos chansons préférées, » (aucun mot en gras). Titre : « ***<Titre>,*** de <Artiste> ? » (titre en Black Italic, le reste en Regular, ≈ 104 px, Kaneda, jamais une police script).
+- **Lignes « parlées » (abonnement, titre, accroche)** : pas de graisse partout. Une ligne en **Regular 400**, et seul le mot clé passe en **Black 900**, même famille et même taille, dans la même ligne (≈ 68 px) : « alors **abonne-toi** pour la suite, », « ça me soutient **énormément**. », « Je raconte l'histoire derrière vos chansons préférées, » (aucun mot en gras). Titre : « ***<Titre>,*** de <Artiste> ? » (titre en Black Italic, le reste en Regular, Kaneda, jamais une police script).
 - **Italiques**, pour varier sans casser l'harmonie :
   - **quoi** : les titres d'œuvres (chanson, album : « *Like a Tattoo,* », « *Love Deluxe* ») et les mots d'aveu ou d'émotion (« *pour toujours* », « *effacer* ») ;
   - **graisse** : mot héros en **Black Italic 900** ; fin de phrase tendre en **Light Italic 300** (« gravée *pour toujours* ») ; dans un bloc cinétique, une seule ligne en Light Italic ; dans la ligne titre, le titre du morceau en Black Italic ;
@@ -105,6 +105,18 @@ N'utilise jamais `linear` ni `power1` pour un mouvement visible (seule exception
 
 **Bloc cinétique** pour une phrase longue sans image (≥ 8 mots, ex. « et cette idée : il y a des souvenirs qu'on ne peut pas effacer. ») : découpe-la en 3 à 5 lignes de sens, chaque ligne mise à la **même largeur** (≈ 820 px, la taille de police varie donc d'une ligne à l'autre ; mesure la largeur avec le vrai fichier de police), graisses alternées Light / Bold et la ligne du mot héros en Black. Chaque ligne arrive du bas (`y: 140, scale: 0.7, opacity: 0 → 1`, 0.4 s, `smooth`) quand elle est dite ; le bloc entier se recentre et se réduit à chaque nouvelle ligne (les lignes se poussent et prennent la place les unes des autres) jusqu'à former un bloc justifié harmonieux.
 
+**Variations de mise en page et de texte** (relevées image par image sur la vidéo « The Lady in My Life » de la personne) :
+- **Placement libre** : environ un écran sur trois, le bloc quitte le centre et se cale dans un coin ou sur un bord (haut droite aligné à droite, bas gauche aligné à gauche, haut gauche) ; l'écran suivant change de zone. Le texte seul, sans image, est souvent posé ainsi, petit (≈ 62 px), avec beaucoup de blanc autour. Tout reste dans la zone sûre (x 90–990, y 300–1600).
+- **Emphase par la taille seule** : dans une ligne Regular, le mot clé reste en Regular mais passe à ≈ 1.45× la taille (« quand **Quincy Jones** lui », « dans les **dernières** minutes ») ; à utiliser pour les noms propres, en alternance avec l'emphase par la graisse.
+- **Gras en ligne, même taille** : une phrase Regular ≈ 62 px où le mot clé passe en Black 900 sans changer de taille (« pour l'album **Thriller** », « Michael était tellement **mal à l'aise** », « **coupée** avant la sortie »). C'est la forme la plus fréquente sur les textes longs ; garde le mot héros géant (190 px) pour les mots courts et forts.
+- **Le texte descend sur la carte** : la ligne au-dessus d'une carte naît plus haut, plus grosse, floue et grise (`y: −90, scale: 1.15, blur 8 px, #BBB`) et se pose en noir (0.7 s, `smooth`). Elle peut aussi naître sous la carte et monter (`y: +60`), floue et grise.
+- **Texte à côté de l'image** : carte portrait à gauche (≈ 420×640), deux lignes courtes à sa droite, alignées à gauche, centrées sur la hauteur de la carte, Regular + Light ; le texte glisse de `x: −60` (0.45 s, `smooth`).
+- **Révélation depuis une ligne** : un trait noir vertical (4 px, hauteur de la future carte) se dessine au centre (`scaleY 0 → 1`, 0.35 s), reste un instant seul sur le blanc, puis la carte s'ouvre depuis ce trait (`clip-path: inset(0 50% 0 50%) → inset(0)`, 0.5 s, `smooth`). Transition forte, 1 fois par vidéo.
+- **Réduction en vignette vers un coin** : à la fin d'une idée, la carte rétrécit à ≈ 28 % en filant vers un coin haut (`transform-origin` du coin, 0.5 s, `inout`), puis s'éteint en point (0.18 s) ; le texte suivant apparaît dans une autre zone.
+- **Le geste illustre le mot** : quand un mot décrit une action physique, l'image la fait. « coupée » : le vinyle (ou la carte) est tranché net en diagonale (deux copies de l'élément avec `clip-path: polygon` complémentaires), le morceau du haut s'envole et s'efface, le reste glisse un peu vers le bas en tournant. Autres exemples : « effacée » → la carte se gomme de gauche à droite, « éteigne » → l'image passe au noir, « s'isole » → la carte rétrécit seule au milieu du blanc. Au plus 1 à 2 fois par vidéo.
+- **Vinyle comme carte** : au milieu de l'histoire, quand on parle d'une version ou d'un disque, un vinyle (étiquette = photo de l'artiste ou pochette) remplace la carte, tourne lentement et porte le texte dessous.
+- **Carte portrait haute** : pour une illustration ou un portrait, carte 9:16 étroite (≈ 400 px de large) plutôt que carrée.
+
 Règles de rythme :
 - Un nouvel élément (texte, carte ou changement de carte) **toutes les 1 à 2 s**. Une image reste rarement plus de 4 s, sauf une vidéo qui joue.
 - Les entrées d'images tombent **sur le mot** auquel elles correspondent dans la voix, pas avant.
@@ -134,11 +146,11 @@ Rien n'est figé sur une chanson : seuls la pochette, le titre et l'artiste chan
   - **Mise en page** : scène 600×600 (left 240, top 520) ; pochette coins 18 px, ombre `0 30px 60px rgba(0,0,0,.18)` ; ligne du haut top 400, Regular 68 px ; titre top 1170, 104 px, titre en Black Italic, « de <Artiste> ? » en Regular.
   - **Intro** (s) : 0 pochette `scale 0.6→1, y 220→0, opacity 0→1, blur 24→0`, 0.75 s `smooth` · 0.25 ligne du haut tapée (stagger 0.035) · 0.5 vinyle visible derrière · 0.55 vinyle `x→+220` et pochette `x→−220, rotation −4°`, 0.8 s `smooth` · 1.35 pochette s'envole `x→−1000, rotation −16°, opacity 0`, 0.6 s `inquick`, vinyle `x→0`, 0.7 s `inout` · 1.55 mots du titre montent de `y 90` avec flou 12 px, 0.6 s `smooth`, stagger 0.09.
   - **Sortie** (E = fin) : E−1.55 textes `y→−40, opacity 0, flou`, 0.4 s `inquick` ; pochette revient `x→−220, rotation −4°, opacity 1`, 0.5 s `smooth` ; vinyle `x→+220`, 0.45 s `inout` · E−1.0 vinyle et pochette `x→0, rotation 0`, 0.42 s `inquick` · E−0.45 scène `scale→0`, 0.3 s `inquick`.
-- Générateur prêt à l'emploi et spec complète : `/mnt/project-files/skill-tiktok/pochette/` (`pochette.py --cover --title --artist --mode intro|outro|both [--opening cover|pochette] [--hold 2]`, `SPEC.md`).
+- Générateur prêt à l'emploi et spec complète : `/mnt/project-files/skill-tiktok/pochette/` et `skills/pochette/` du dépôt tiktok_video (`pochette.py --cover --title --artist --mode intro|outro|both [--opening cover|pochette] [--hold 2]`, `SPEC.md`).
 
 ## Construction HyperFrames
 
-- Racine `index.html` : la voix off en `<audio id="vo" src="assets/voice.mp3">`, une sous-composition par chapitre dans `compositions/` (accroche, abonnement, corps-1…, outro) pour éviter `timeline_track_too_dense`.
+- Racine `index.html` : la voix off en `<audio id="vo" src="assets/voice.mp3">`, une sous-composition par chapitre dans `compositions/` (couverture, abonnement, corps-1…, outro) pour éviter `timeline_track_too_dense`.
 - Chaque élément animé est enveloppé : la `.clip` gère l'apparition (`data-start`/`data-duration`), un enfant `.inner` reçoit `scale`/`x`/`y`. Jamais d'animation de `display`/`visibility` sur la `.clip`.
 - Les textes, couleurs d'accent et sources d'images sont des variables (`data-var-text`, `data-var-src`, `var(--accent)`) pour que la personne puisse les modifier dans l'app HyperFrames.
 - Une seule timeline en pause par composition, enregistrée dans `window.__timelines`. Tout temps est calculé depuis les horodatages de la transcription, jamais à la main au jugé.
