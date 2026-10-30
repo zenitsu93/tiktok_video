@@ -531,6 +531,8 @@ html, body { width:${W}px; height:${H}px; overflow:hidden; background:#ffffff; }
 .w { display:inline-block; white-space:nowrap; }
 .it { font-style:italic; }
 .cline { position:absolute; left:120px; font-weight:400; white-space:nowrap; }
+/* own layer for everything GSAP moves or scales: without it Chrome snaps text to whole pixels and it shakes. Never on .ch */
+.inner, .card img, .cut img, .disc, .stage, .sleeve, .tinner, .block, .part, .kline, .cline { will-change:transform; }
 </style>
 ${o.extraHead ?? ""}
 </head>
