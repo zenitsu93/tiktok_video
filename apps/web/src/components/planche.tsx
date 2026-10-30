@@ -1,8 +1,10 @@
 "use client";
 
-import { Check, ExternalLink, ImagePlus, Loader2, Search } from "lucide-react";
+import { Check, ExternalLink, ImagePlus, Library, Loader2, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import type { LibraryItem } from "@/lib/library";
 import type { BeatView, VideoView } from "@/lib/view";
+import { ideaSuggestions, putFromShelf, ShelfSearch, ShelfThumb, useLibrary } from "./library";
 import type { Notify } from "./pronunciations";
 
 /** One idea: the lines that share the same searches (the Régie gives them one picture between them). */
@@ -65,6 +67,9 @@ export function Planche({ v, notify, onSearch }: { v: VideoView; notify: Notify;
   const lit = ideas.some((i) => i.key === active) ? active : firstOpen;
   const done = ideas.filter(filled).length;
   const left = ideas.filter((i) => !filled(i));
+  const shelfItems = useLibrary();
+  const [shelf, setShelf] = useState(false);
+  const litIdea = ideas.find((i) => i.key === lit);
 
   async function upload(idea: Idea, f: File) {
     if (!f.type.startsWith("image/") && !f.type.startsWith("video/")) return notify.flash("Ce n'est ni une image, ni un GIF, ni une vidéo.", true);
@@ -118,6 +123,11 @@ export function Planche({ v, notify, onSearch }: { v: VideoView; notify: Notify;
         <div className="planche-prog" aria-hidden="true">
           <i style={{ width: `${(done / ideas.length) * 100}%` }} />
         </div>
+        {Boolean(shelfItems?.length) && (
+          <button className="btn sm" aria-expanded={shelf} onClick={() => setShelf((o) => !o)} title="Les images gardées sur tes autres vidéos : gratuit">
+            <Library size={14} /> Bibliothèque · {shelfItems!.length}
+          </button>
+        )}
         {left.length > 1 && (
           <button className="btn sm" onClick={openLeft} title="Ouvre un onglet Pinterest par idée sans image (8 au plus)">
             <ExternalLink size={14} /> Ouvrir les {Math.min(left.length, 8)} restantes
@@ -129,6 +139,16 @@ export function Planche({ v, notify, onSearch }: { v: VideoView; notify: Notify;
         s&apos;allume. Tu peux aussi glisser un fichier sur une case, ou la toucher pour choisir une photo. Un GIF ou une courte vidéo marche aussi :
         enregistre-le, puis glisse-le dans la case (il joue en boucle, sans le son).
       </p>
+      {shelf && (
+        <ShelfSearch
+          v={v}
+          beatIds={litIdea ? litIdea.need.map((b) => b.id) : []}
+          queries={litIdea?.queries ?? []}
+          notify={notify}
+          onClose={() => setShelf(false)}
+          target={litIdea ? `la case ${litIdea.beats.map((b) => b.id.replace(/^b/, "")).join(" · ")}` : undefined}
+        />
+      )}
       <div className="planche-grid">
         {ideas.map((idea) => (
           <Tile
@@ -142,6 +162,7 @@ export function Planche({ v, notify, onSearch }: { v: VideoView; notify: Notify;
             onFile={(f) => void upload(idea, f)}
             onSearch={() => onSearch(idea.need[0]!.id)}
             notify={notify}
+            mine={filled(idea) ? [] : ideaSuggestions(shelfItems, v, idea.queries, 4)}
           />
         ))}
       </div>
@@ -159,6 +180,7 @@ function Tile({
   onFile,
   onSearch,
   notify,
+  mine,
 }: {
   idea: Idea;
   v: VideoView;
@@ -169,6 +191,8 @@ function Tile({
   onFile: (f: File) => void;
   onSearch: () => void;
   notify: Notify;
+  /** Pictures from the library that fit this idea: a click and it is done, for free. */
+  mine: LibraryItem[];
 }) {
   const [drag, setDrag] = useState(false);
   const shown = idea.need.find((b) => b.image)?.image;
@@ -250,6 +274,16 @@ function Tile({
         />
       </label>
       <p className="tile-text">{idea.beats.map((b) => b.text).join(" ")}</p>
+      {mine.length > 0 && !busy && (
+        <div className="tile-mine" aria-label="Dans ta bibliothèque">
+          <span className="minemark">À toi</span>
+          <div className="tile-cands">
+            {mine.map((m) => (
+              <ShelfThumb key={m.assetId} item={m} small onPick={() => void putFromShelf(v, idea.need.map((b) => b.id), m, notify)} />
+            ))}
+          </div>
+        </div>
+      )}
       {cands.length > 0 && (
         <div className="tile-cands" aria-label="Images trouvées par la Régie">
           {cands.map((c) => (

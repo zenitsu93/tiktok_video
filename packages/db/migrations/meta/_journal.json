@@ -29,6 +29,13 @@
       "when": 1793362430390,
       "tag": "0003_scene_video",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793386498663,
+      "tag": "0004_library",
+      "breakpoints": true
     }
   ]
 }

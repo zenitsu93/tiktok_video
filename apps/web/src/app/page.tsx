@@ -1,6 +1,6 @@
 import { getDb, listVideos } from "@regie/db";
 import { providers } from "@regie/server";
-import { Gauge } from "lucide-react";
+import { Gauge, Library } from "lucide-react";
 import Link from "next/link";
 import { CopyCaption } from "@/components/caption";
 import { DeleteVideo } from "@/components/delete-video";
@@ -22,6 +22,9 @@ export default async function Home() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="logo-in" src="/logo.svg" alt="Thomas" width={44} height={44} />
         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          <Link href="/bibliotheque" className="btn ghost sm">
+            <Library size={15} /> Bibliothèque
+          </Link>
           <Link href="/conso" className="btn ghost sm">
             <Gauge size={15} /> Conso
           </Link>
