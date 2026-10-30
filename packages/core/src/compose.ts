@@ -28,8 +28,8 @@ export interface Scene {
   endFrame: number;
   /** Vinyl scenes with a cover: the song, for the "bac à disques" cover that opens and closes the video. */
   song?: { title: string; artist: string; hook: string };
-  /** The video's look (seed and black and white), when it has one. */
-  look?: { seed: number; mono: boolean };
+  /** The video's look (seed, black and white, zoom and exits), when it has one. */
+  look?: VideoDoc["look"];
 }
 
 export const sceneStart = (s: Scene) => s.startFrame / FPS;
@@ -151,6 +151,14 @@ function entranceJs(sel: string, e: Entrance, t: number): string[] {
   }
 }
 
+/** Text-only screens off centre: one spot per corner of the TikTok safe zone. */
+const CORNERS: Partial<Record<NonNullable<Beat["place"]>, string>> = {
+  topright: "top:330px;justify-content:flex-end;padding-right:90px",
+  topleft: "top:330px;justify-content:flex-start;padding-left:90px",
+  bottomleft: "top:1150px;justify-content:flex-start;padding-left:90px",
+  bottomright: "top:1150px;justify-content:flex-end;padding-right:90px",
+};
+
 /** A cut-out born from a blur: a memory, a ghost, something unreal. */
 function ghostJs(sel: string, t: number): string[] {
   return [`tl.fromTo("${sel}",{scale:1.08,opacity:0,filter:"blur(30px)"},{scale:1,opacity:1,filter:"blur(0px)",duration:0.9,ease:"smooth"},${t3(t)});`];
@@ -254,6 +262,9 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
   const movesIn = new Set<Move>(scene.beats.map((b) => b.move ?? "none"));
   let textTop: number | null = null;
   let textLeft: number | null = null;
+  /** Text above the card: its bottom edge. Text aligned on the card's right edge: the space on its right. */
+  let textBottom: number | null = null;
+  let textRight: number | null = null;
   /** Text beside a portrait card: its column and the card's height, to centre on it. */
   let side: { left: number; top: number; h: number } | null = null;
   const fullscreen = first.move === "fullscreen" && scene.kind === "card";
@@ -291,10 +302,19 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
         h = Math.min(640, Math.round((w * ih) / iw));
         left = 90;
       }
-      const top = CARD_CY - Math.round(h / 2);
-      if (first.place === "side" && w === 420 && left === 90) side = { left: left + w + 44, top, h };
-      textTop = top + h + 46;
+      const zone = first.zone ?? "under";
+      const isSide = first.place === "side" && w === 420 && left === 90;
+      const above = !isSide && cls === "card" && (zone === "above" || zone === "aboveright");
+      // text above: the card sits lower to leave it the top of the screen
+      const top = CARD_CY + (above ? 170 : 0) - Math.round(h / 2);
+      if (isSide) side = { left: left + w + 44, top, h };
+      if (above) textBottom = H - top + 40;
+      else textTop = top + h + 46;
       textLeft = cls === "card" ? left : null;
+      if (cls === "card" && !isSide && (zone === "underright" || zone === "aboveright")) {
+        textRight = W - (left + w);
+        textLeft = null;
+      }
       const shards =
         movesIn.has("shatter") && cls === "card" && !clip
           ? SHARDS.map((poly, i) => `<div class="card shard sh${i}" style="clip-path:${poly};opacity:0">${media}</div>`).join("")
@@ -307,7 +327,10 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
       if (first.move === "ghost" && scene.kind === "cutout") js.push(...ghostJs(`#${sid} .inner`, s0));
       else js.push(...entranceJs(`#${sid} .inner`, first.entrance, s0));
       // soft zoom on the picture for the whole hold, alternating in and out (a clip moves on its own)
-      const zoom = scene.kind === "cutout" ? [1, 1.05] : (scene.index + seed) % 2 === 0 ? [1, 1.12] : [1.12, 1];
+      const mode = scene.look?.zoom ?? "alt";
+      const zoomIn = mode === "in" || mode === "push" || (mode === "alt" && (scene.index + seed) % 2 === 0);
+      const far = mode === "push" ? 1.2 : 1.12;
+      const zoom = scene.kind === "cutout" ? [1, 1.05] : zoomIn ? [1, far] : [far, 1];
       if (!clip) js.push(`tl.fromTo("#${sid} .${cls} img",{scale:${zoom[0]}},{scale:${zoom[1]},duration:${t3(dur)},ease:"sine.inOut"},${t3(s0)});`);
     }
 
@@ -348,7 +371,7 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
     } else if (first.move === "ghost" && scene.kind === "cutout" && dur > 0.9) {
       // the ghost leaves sliced on a slant
       js.push(`tl.fromTo("#${sid} .inner",{clipPath:"polygon(0 0,100% 0,100% 100%,0 100%)"},{clipPath:"polygon(0 0,100% 0,100% 0%,0 30%)",duration:0.3,ease:"inquick",immediateRender:false},${t3(s0 + dur - 0.32)});`);
-    } else if (dur > 0.9 && (scene.index + seed) % 2 === 0) {
+    } else if (dur > 0.9 && scene.look?.exit !== "cut" && (scene.look?.exit === "point" || (scene.index + seed) % 2 === 0)) {
       js.push(`tl.to("#${sid} .inner",{scale:0,duration:0.15,ease:"inquick"},${t3(s0 + dur - 0.17)});`);
     }
   } else if (scene.kind === "vinyl") {
@@ -413,15 +436,17 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
       // beside the portrait card, centred on its height
       pos = `top:${side.top}px;height:${side.h}px;align-items:center;justify-content:flex-start;padding-left:${side.left}px;padding-right:60px`;
       blockCls += " side";
-    } else if (textTop !== null) pos = `top:${textTop}px`;
-    else if (b.place === "topright") {
-      pos = "top:330px;justify-content:flex-end;padding-right:90px";
-      blockCls += " corner right";
-    } else if (b.place === "bottomleft") {
-      pos = "top:1150px;justify-content:flex-start;padding-left:90px";
-      blockCls += " corner";
+    } else if (textTop !== null || textBottom !== null) {
+      pos = textTop !== null ? `top:${textTop}px` : `bottom:${textBottom}px;align-items:flex-end`;
+      if (textRight !== null) {
+        pos += `;justify-content:flex-end;padding-right:${textRight}px;padding-left:60px`;
+        blockCls += " right";
+      }
+    } else if (b.place && CORNERS[b.place]) {
+      pos = CORNERS[b.place]!;
+      blockCls += b.place.endsWith("right") ? " corner right" : " corner";
     } else pos = "top:0;bottom:0;align-items:center";
-    if (side || blockCls.includes(" corner")) {
+    if (side || blockCls.includes(" corner") || textRight !== null) {
       // placed off centre: already aligned
     } else if (textLeft !== null) {
       pos += `;justify-content:flex-start;padding-left:${textLeft}px;padding-right:60px`;

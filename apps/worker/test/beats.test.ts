@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balanceRows, pickMoves, pickPlaces, takeCuts, toBeats, type Row } from "../src/beats";
+import { balanceRows, drawStyle, pickMoves, pickPlaces, takeCuts, toBeats, type Row } from "../src/beats";
 
 const text = (t: string, hero = ""): Row => ({ text: t, hero, layout: "text", imageQuery: { kind: "none", queries: [] } });
 const card = (t: string, q: string): Row => ({ text: t, hero: "", layout: "card", imageQuery: { kind: "pinterest", queries: [q] } });
@@ -104,11 +104,24 @@ describe("gestures and placements", () => {
     moves.forEach((m, i) => m === "evaporate" && expect(story()[i + 1]!.layout).toBe("text"));
   });
 
-  it("moves text-only lines to the corners, never the same corner twice in a row", () => {
-    const rows = Array.from({ length: 8 }, (_, i) => text(`ligne ${i}`));
-    const corners = pickPlaces(rows, 3).filter((p) => p !== "hero");
-    expect(corners.length).toBe(4);
-    corners.slice(1).forEach((p, i) => expect(p).not.toBe(corners[i]));
+  it("moves text-only lines around the screen, never twice to the same spot in a row", () => {
+    const rows = Array.from({ length: 12 }, (_, i) => text(`ligne ${i}`));
+    const { places } = pickPlaces(rows, 3);
+    expect(places.filter((p) => p !== "hero").length).toBeGreaterThan(3);
+    places.slice(1).forEach((p, i) => expect(p).not.toBe(places[i]));
+  });
+
+  it("keeps one text zone per picture and varies it from picture to picture", () => {
+    const rows = Array.from({ length: 16 }, (_, i) => card(`idée ${i >> 1}`, `q${i >> 1}`));
+    const { zones } = pickPlaces(rows, 11);
+    for (let i = 0; i < rows.length; i += 2) expect(zones[i + 1]).toBe(zones[i]);
+    expect(new Set(zones).size).toBeGreaterThan(1);
+  });
+
+  it("draws a different language for different videos", () => {
+    const styles = [1, 2, 3, 4, 5, 6].map((s) => drawStyle(s));
+    expect(new Set(styles.map((s) => s.entrances.join())).size).toBe(6);
+    expect(new Set(styles.map((s) => `${s.zoom}/${s.exit}/${s.zones[0]![0]}`)).size).toBeGreaterThan(1);
   });
 
   it("gives every video its own sequence of entrances", () => {

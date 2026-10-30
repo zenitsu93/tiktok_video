@@ -53,10 +53,14 @@ export const MOVE_LABELS: Record<Move, string> = {
  * - size: small + big in the same Regular weight (« et pourtant chaque soir »)
  * - inline: one Regular line, the key word in Black at the same size (long lines)
  * - side: next to a portrait card instead of under it
- * - topright / bottomleft: a text-only screen leaves the centre for a corner
+ * - topright / bottomleft / topleft / bottomright: a text-only screen leaves the centre for a corner
  */
-export const PLACES = ["hero", "size", "inline", "side", "topright", "bottomleft"] as const;
+export const PLACES = ["hero", "size", "inline", "side", "topright", "bottomleft", "topleft", "bottomright"] as const;
 export type Place = (typeof PLACES)[number];
+
+/** Where the text sits around a card: under or above it, aligned on its left or right edge. */
+export const ZONES = ["under", "underright", "above", "aboveright"] as const;
+export type Zone = (typeof ZONES)[number];
 
 /**
  * How a beat is laid out:
@@ -133,6 +137,8 @@ export const beatSchema = z.object({
   move: z.enum(MOVES).optional(),
   /** Text placement and stress (absent: hero). */
   place: z.enum(PLACES).optional(),
+  /** Text around the card (absent: under). */
+  zone: z.enum(ZONES).optional(),
 });
 export type Beat = z.infer<typeof beatSchema>;
 
@@ -160,7 +166,16 @@ export const videoDocSchema = z.object({
    * The video's own look, drawn once when the script is split so no two videos open the same way:
    * mono puts every picture in black and white (a dark song); the cover, record and sleeve keep their colours.
    */
-  look: z.object({ seed: z.number().int().min(0).max(1_000_000), mono: z.boolean() }).optional(),
+  look: z
+    .object({
+      seed: z.number().int().min(0).max(1_000_000),
+      mono: z.boolean(),
+      /** The soft zoom of the video: alternating in and out, always in, always out, or a stronger push in. */
+      zoom: z.enum(["alt", "in", "out", "push"]).optional(),
+      /** How ideas end: collapse to a point every other scene, every scene, or hard cuts to white. */
+      exit: z.enum(["mix", "point", "cut"]).optional(),
+    })
+    .optional(),
   /** The TikTok caption with its hashtags. The send to TikTok carries no text: Thomas pastes it there. */
   caption: z.string().max(2200).optional(),
 });
@@ -180,6 +195,7 @@ export const beatPatchSchema = z
     italic: z.boolean(),
     move: z.enum(MOVES),
     place: z.enum(PLACES),
+    zone: z.enum(ZONES),
   })
   .partial()
   .strict();

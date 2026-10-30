@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import pLimit from "p-limit";
 import { hasChecker, removeBackground, removeChecker } from "./background";
-import { takeCuts, toBeats } from "./beats";
+import { drawStyle, takeCuts, toBeats } from "./beats";
 import { animatedGif, ff, ingestClip, ingestImage, ingestVoice, sliceTake, storeFile, withTemp } from "./media";
 import { editBeat, splitScript, writeCaption, writeScript } from "./providers/claude";
 import { demoCaption, demoImages, demoScript, demoSplit, demoVoice } from "./providers/demo";
@@ -239,7 +239,9 @@ export async function generate(videoId: string) {
       ? await splitScript(videoId, script)
       : { beats: script === demo!.beats.map((b) => b.text).join(" ") ? demo!.beats : demoSplit(script), mood: "lumineux" as const };
     // the video's own draw: where the entrances start, which lines stress how, black and white for a dark story
-    const look = { seed: randomInt(1_000_000), mono: split.mood === "sombre" };
+    const seed = randomInt(1, 1_000_000);
+    const { zoom, exit } = drawStyle(seed);
+    const look = { seed, mono: split.mood === "sombre", zoom, exit };
     beats = toBeats(split.beats, look.seed);
     await mutateDoc(db(), videoId, "script", (d) => ({ ...d, beats, look, sources, draft: null }));
   }
