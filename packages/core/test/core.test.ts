@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyBeatPatch,
   buildScenes,
+  coverTitleSize,
   demoDoc,
   EditError,
   parseCommand,
@@ -89,6 +90,25 @@ describe("scenes", () => {
     }
     expect(sceneDocument(all[0]!, ctx(d))).toContain('class="sleeve"');
     expect(sceneDocument(all.at(-1)!, ctx(d))).toContain('class="sleeve"');
+  });
+
+  it("opens and closes on the « bac à disques » cover: hook, title in Black Italic, artist", () => {
+    const cover = { id: "cover", kind: "image" as const, mime: "image/jpeg", width: 1000, height: 1000 };
+    const d = { ...doc, title: "Like a Tattoo", artist: "Sade", cover: "cover", assets: { ...doc.assets, cover } };
+    const all = buildScenes(d).scenes;
+    for (const s of [all[0]!, all.at(-1)!]) {
+      const html = sceneDocument(s, ctx(d), "assets", "kaneda");
+      expect(html).toContain("Like a Tattoo,</div>");
+      expect(html).toContain("de Sade ?</div>");
+    }
+    // the opening shows the cover from frame 0 instead of typing its lines
+    const intro = sceneDocument(all[0]!, ctx(d));
+    expect(intro).not.toMatch(/id="s0b\d+"/);
+    expect(intro).toContain('tl.fromTo("#s0 .sleeve",{x:-120,rotation:-3,opacity:1}');
+    // the ending fades the cover lines in late without blanking its first frame
+    expect(sceneDocument(all.at(-1)!, ctx(d))).toContain("immediateRender:false");
+    expect(coverTitleSize("Like a Tattoo")).toBe(190);
+    expect(coverTitleSize("We Are the World")).toBeLessThan(190);
   });
 
   it("builds a HyperFrames root for each scene", () => {
