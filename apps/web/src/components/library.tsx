@@ -45,8 +45,21 @@ export function ideaSuggestions(items: LibraryItem[] | null, v: VideoView, queri
   );
 }
 
-/** Puts a library picture on the lines of one idea. Free: nothing is searched. */
-export async function putFromShelf(v: VideoView, beatIds: string[], item: LibraryItem, notify: Notify) {
+/**
+ * The one library picture the Régie would take for an idea by itself (the same rule as before a
+ * Pinterest search: two shared words), or null when none fits. `taken`: pictures already given.
+ */
+export function bestFromShelf(items: LibraryItem[] | null, v: VideoView, queries: string[], taken: Set<string> = new Set()): LibraryItem | null {
+  if (!items?.length || !queries.length) return null;
+  return libraryForIdea(
+    items.filter((i) => !v.images[i.assetId] && !taken.has(i.assetId)),
+    queries,
+    1,
+  )[0] ?? null;
+}
+
+/** Puts a library picture on the lines of one idea. Free: nothing is searched. `quiet`: no message, no refresh (a batch says it once). */
+export async function putFromShelf(v: VideoView, beatIds: string[], item: LibraryItem, notify: Notify, quiet = false): Promise<boolean> {
   const [first, ...also] = beatIds;
   try {
     const r = await fetch(`/api/videos/${v.id}/beats/${first}/library`, {
@@ -55,10 +68,14 @@ export async function putFromShelf(v: VideoView, beatIds: string[], item: Librar
       body: JSON.stringify({ asset: item.assetId, also }),
     });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `Erreur ${r.status}`);
-    notify.flash(`« ${item.label} » vient de ta bibliothèque`);
-    notify.onChange();
+    if (!quiet) {
+      notify.flash(`« ${item.label} » vient de ta bibliothèque`);
+      notify.onChange();
+    }
+    return true;
   } catch (e) {
     notify.flash(e instanceof Error ? e.message : "Impossible", true);
+    return false;
   }
 }
 

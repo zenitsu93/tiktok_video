@@ -1,10 +1,10 @@
 "use client";
 
-import { Check, ExternalLink, ImagePlus, Library, Loader2, Search } from "lucide-react";
+import { Check, ExternalLink, ImagePlus, Library, Loader2, Search, Wand2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { LibraryItem } from "@/lib/library";
 import type { BeatView, VideoView } from "@/lib/view";
-import { ideaSuggestions, putFromShelf, ShelfSearch, ShelfThumb, useLibrary } from "./library";
+import { bestFromShelf, ideaSuggestions, putFromShelf, ShelfSearch, ShelfThumb, useLibrary } from "./library";
 import type { Notify } from "./pronunciations";
 
 /** One idea: the lines that share the same searches (the Régie gives them one picture between them). */
@@ -70,6 +70,36 @@ export function Planche({ v, notify, onSearch }: { v: VideoView; notify: Notify;
   const shelfItems = useLibrary();
   const [shelf, setShelf] = useState(false);
   const litIdea = ideas.find((i) => i.key === lit);
+  const [filling, setFilling] = useState(false);
+
+  /** « Chercher dans ma bibliothèque » : the picture that fits this idea goes on it, or nothing does. */
+  async function fromShelf(idea: Idea) {
+    const best = bestFromShelf(shelfItems, v, idea.queries);
+    if (!best) return notify.flash("Rien dans ta bibliothèque pour cette idée.");
+    await putFromShelf(v, idea.need.map((b) => b.id), best, notify);
+  }
+
+  /** The same for every empty tile, one picture per idea, never the same one twice. */
+  async function fillFromShelf() {
+    setFilling(true);
+    const taken = new Set<string>();
+    let put = 0;
+    for (const idea of left) {
+      if (busy(idea)) continue;
+      const best = bestFromShelf(shelfItems, v, idea.queries, taken);
+      if (!best) continue;
+      taken.add(best.assetId);
+      if (await putFromShelf(v, idea.need.map((b) => b.id), best, notify, true)) put++;
+    }
+    setFilling(false);
+    notify.onChange();
+    const rest = left.length - put;
+    notify.flash(
+      put
+        ? `${put} ${put > 1 ? "cases remplies" : "case remplie"} depuis ta bibliothèque${rest ? `, ${rest} sans image qui va` : ""}.`
+        : "Rien dans ta bibliothèque ne va avec les cases vides.",
+    );
+  }
 
   async function upload(idea: Idea, f: File) {
     if (!f.type.startsWith("image/") && !f.type.startsWith("video/")) return notify.flash("Ce n'est ni une image, ni un GIF, ni une vidéo.", true);
@@ -123,6 +153,16 @@ export function Planche({ v, notify, onSearch }: { v: VideoView; notify: Notify;
         <div className="planche-prog" aria-hidden="true">
           <i style={{ width: `${(done / ideas.length) * 100}%` }} />
         </div>
+        {Boolean(shelfItems?.length) && left.length > 0 && (
+          <button
+            className="btn sm"
+            disabled={filling}
+            onClick={() => void fillFromShelf()}
+            title="Pour chaque case vide, la Régie cherche dans tes images gardées et pose celle qui va, sinon elle laisse vide. Gratuit."
+          >
+            {filling ? <Loader2 size={14} className="spin" /> : <Wand2 size={14} />} Remplir depuis ma bibliothèque
+          </button>
+        )}
         {Boolean(shelfItems?.length) && (
           <button className="btn sm" aria-expanded={shelf} onClick={() => setShelf((o) => !o)} title="Les images gardées sur tes autres vidéos : gratuit">
             <Library size={14} /> Bibliothèque · {shelfItems!.length}
@@ -161,6 +201,7 @@ export function Planche({ v, notify, onSearch }: { v: VideoView; notify: Notify;
             onLight={() => setActive(idea.key)}
             onFile={(f) => void upload(idea, f)}
             onSearch={() => onSearch(idea.need[0]!.id)}
+            onShelf={shelfItems?.length ? () => void fromShelf(idea) : undefined}
             notify={notify}
             mine={filled(idea) ? [] : ideaSuggestions(shelfItems, v, idea.queries, 4)}
           />
@@ -179,6 +220,7 @@ function Tile({
   onLight,
   onFile,
   onSearch,
+  onShelf,
   notify,
   mine,
 }: {
@@ -190,6 +232,8 @@ function Tile({
   onLight: () => void;
   onFile: (f: File) => void;
   onSearch: () => void;
+  /** « Ma bibliothèque » : the picture that fits, or a message that none does. */
+  onShelf?: () => void;
   notify: Notify;
   /** Pictures from the library that fit this idea: a click and it is done, for free. */
   mine: LibraryItem[];
@@ -312,6 +356,18 @@ function Tile({
           }}
         >
           <Search size={13} /> La Régie cherche
+        </button>
+      )}
+      {!idea.cover && !filled && !busy && onShelf && (
+        <button
+          className="btn ghost sm tile-auto"
+          title="Cherche dans tes images gardées et pose celle qui va avec cette idée, sinon rien. Gratuit."
+          onClick={(e) => {
+            e.stopPropagation();
+            onShelf();
+          }}
+        >
+          <Library size={13} /> Ma bibliothèque
         </button>
       )}
     </div>
