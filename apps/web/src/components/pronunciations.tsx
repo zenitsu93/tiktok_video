@@ -1,19 +1,28 @@
 "use client";
 
-import { Plus, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useState } from "react";
-import type { VideoView } from "@/lib/view";
+import type { BeatView, VideoView } from "@/lib/view";
 
-const small: React.CSSProperties = { flex: 1, minWidth: 0, fontSize: 14, padding: "7px 10px", borderRadius: 9 };
+export type Lexicon = { flash: (text: string, err?: boolean) => void; onChange: () => void };
+
+const norm = (s: string) => s.toLocaleLowerCase("fr");
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// same word edges as spokenText in @regie/core
+const found = (text: string, word: string) => new RegExp(`(?<![\\p{L}\\p{N}])${escape(word)}(?![\\p{L}\\p{N}])`, "iu").test(text);
+const countIn = (v: VideoView, word: string) => v.beats.filter((b) => found(b.text, word)).length;
 
 /**
- * Words the voice must say otherwise than they are written: « Sade » on screen, « Chadé »
- * in the voice. Shared by every video; the lines of this one are voiced again at once.
+ * Pronunciation, on the word itself: a click on a word of the line opens a bubble that says
+ * how the voice reads it. A word with a rule shows its reading above it. A rule is shared by
+ * every video and every occurrence; the lines of this video are voiced again at once.
  */
-export function Pronunciations({ v, onChange, flash }: { v: VideoView; onChange: () => void; flash: (text: string, err?: boolean) => void }) {
-  const [word, setWord] = useState("");
-  const [say, setSay] = useState("");
+export function PronounceWords({ b, v, words, lexicon }: { b: BeatView; v: VideoView; words: string[]; lexicon: Lexicon }) {
+  const [open, setOpen] = useState<{ word: string; say: string; known: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+  const ruleOf = (w: string) => v.pronunciations.find((p) => norm(p.word) === norm(w));
+  // rules of several words (« Sade Adu ») that this line contains
+  const phrases = v.pronunciations.filter((p) => /\s/.test(p.word.trim()) && found(b.text, p.word));
 
   async function send(method: "POST" | "DELETE", payload: { word: string; say?: string }) {
     setBusy(true);
@@ -26,49 +35,79 @@ export function Pronunciations({ v, onChange, flash }: { v: VideoView; onChange:
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.error ?? `Erreur ${r.status}`);
       const n: number = data.revoiced ?? 0;
-      const done = method === "POST" ? `« ${payload.word} » se dira « ${payload.say} »` : `« ${payload.word} » se lit de nouveau tel quel`;
-      flash(n ? `${done} · voix refaite sur ${n} ${n > 1 ? "lignes" : "ligne"}` : done);
-      if (method === "POST") {
-        setWord("");
-        setSay("");
-      }
-      onChange();
+      const done = method === "POST" ? `« ${payload.word} » se dira « ${payload.say} » partout` : `« ${payload.word} » se lit de nouveau tel quel`;
+      lexicon.flash(n ? `${done} · voix refaite sur ${n} ${n > 1 ? "lignes" : "ligne"}` : done);
+      setOpen(null);
+      lexicon.onChange();
     } catch (e) {
-      flash(e instanceof Error ? e.message : "Ça n'a pas marché, réessaie.", true);
+      lexicon.flash(e instanceof Error ? e.message : "Ça n'a pas marché, réessaie.", true);
     } finally {
       setBusy(false);
     }
   }
 
+  const n = open?.word.trim() ? countIn(v, open.word.trim()) : 0;
+
   return (
-    <details className="panel" open={v.pronunciations.length > 0 || undefined}>
-      <summary>Prononciation ({v.pronunciations.length})</summary>
-      <p className="mute" style={{ margin: 0, fontSize: 13 }}>
-        À l&apos;écran, le mot reste écrit comme à gauche. La voix le dit comme à droite. Vaut pour toutes les vidéos.
-      </p>
-      {v.pronunciations.map((p) => (
-        <div key={p.word} className="r" style={{ alignItems: "center" }}>
-          <span>
-            <b>{p.word}</b> → {p.say}
-          </span>
-          <button className="btn ghost sm" onClick={() => send("DELETE", { word: p.word })} disabled={busy} aria-label={`Retirer ${p.word}`} title="Retirer">
-            <X size={14} />
-          </button>
-        </div>
-      ))}
-      <form
-        style={{ display: "flex", gap: 6, alignItems: "center" }}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (word.trim() && say.trim()) void send("POST", { word: word.trim(), say: say.trim() });
-        }}
-      >
-        <input className="field" style={small} value={word} onChange={(e) => setWord(e.target.value)} placeholder="Sade" aria-label="Le mot, écrit" maxLength={60} />
-        <input className="field" style={small} value={say} onChange={(e) => setSay(e.target.value)} placeholder="Chadé" aria-label="Comment la voix le dit" maxLength={120} />
-        <button className="btn sm" type="submit" disabled={busy || !word.trim() || !say.trim()} aria-label="Ajouter">
-          <Plus size={14} />
+    <>
+      <div className="words say">
+        {[...new Set(words)].map((w) => {
+          const rule = ruleOf(w);
+          return (
+            <button
+              key={w}
+              className={rule ? "rule" : undefined}
+              data-say={rule?.say}
+              aria-expanded={open !== null && norm(open.word) === norm(w)}
+              title={rule ? `La voix dit « ${rule.say} »` : "Dire ce mot autrement"}
+              onClick={() => setOpen(open && norm(open.word) === norm(w) ? null : { word: rule?.word ?? w, say: rule?.say ?? "", known: Boolean(rule) })}
+            >
+              {w}
+            </button>
+          );
+        })}
+      </div>
+      {phrases.map((p) => (
+        <button key={p.word} className="phrase" onClick={() => setOpen({ word: p.word, say: p.say, known: true })} title="Modifier">
+          <b>{p.word}</b> → {p.say}
         </button>
-      </form>
-    </details>
+      ))}
+      {open && (
+        <form
+          className="say-pop"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (open.word.trim() && open.say.trim()) void send("POST", { word: open.word.trim(), say: open.say.trim() });
+          }}
+        >
+          <div className="r">
+            <input className="field" value={open.word} onChange={(e) => setOpen({ ...open, word: e.target.value })} aria-label="Le mot, écrit" maxLength={60} />
+            <span className="mute">se dit</span>
+            <input
+              className="field"
+              autoFocus
+              value={open.say}
+              onChange={(e) => setOpen({ ...open, say: e.target.value })}
+              placeholder="Chadé"
+              aria-label="Comment la voix le dit"
+              maxLength={120}
+            />
+          </div>
+          <div className="r">
+            <button className="btn dark sm" type="submit" disabled={busy || !open.word.trim() || !open.say.trim()}>
+              Partout comme ça
+            </button>
+            {open.known && (
+              <button className="btn ghost sm" type="button" disabled={busy} onClick={() => send("DELETE", { word: open.word.trim() })}>
+                <X size={14} /> Lire tel quel
+              </button>
+            )}
+            <span className="mute" style={{ fontSize: 12.5 }}>
+              {n} {n > 1 ? "lignes" : "ligne"} dans cette vidéo · vaut pour toutes les vidéos
+            </span>
+          </div>
+        </form>
+      )}
+    </>
   );
 }

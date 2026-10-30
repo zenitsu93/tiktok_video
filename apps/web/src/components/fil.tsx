@@ -8,7 +8,7 @@ import type { BeatView, VideoView } from "@/lib/view";
 import { Caption } from "./caption";
 import { DeleteVideo } from "./delete-video";
 import { Lecture } from "./lecture";
-import { Pronunciations } from "./pronunciations";
+import { PronounceWords, type Lexicon } from "./pronunciations";
 import { TikTokSend, tiktokMoving } from "./tiktok-send";
 import { StatusChip } from "./status";
 import { chime, Fan, Grooves, LineBusy, Platine, Sleeve, stageOf } from "./waits";
@@ -118,6 +118,15 @@ export function Fil({ initial }: { initial: VideoView }) {
       setV(await call(url, "GET"));
     } catch {}
   }, [url]);
+
+  // a pronunciation changed: the revoiced lines come back within seconds
+  const lexicon: Lexicon = {
+    flash,
+    onChange: () => {
+      setEager(Date.now() + 15_000);
+      void refresh();
+    },
+  };
 
   // back from the TikTok sign-in: say how it went, then clean the address
   useEffect(() => {
@@ -508,6 +517,7 @@ export function Fil({ initial }: { initial: VideoView }) {
               job={jobs[b.id]}
               patch={(p, ok) => patch(b.id, p, ok)}
               action={(a, i, ok) => action(b.id, a, i, ok)}
+              lexicon={lexicon}
             />
           ))}
         </div>
@@ -584,14 +594,6 @@ export function Fil({ initial }: { initial: VideoView }) {
           </div>
         </div>
         <Caption v={v} write={() => run(() => call(`${url}/caption`, "POST").then(refresh), "Claude écrit la légende")} />
-        <Pronunciations
-          v={v}
-          flash={flash}
-          onChange={() => {
-            setEager(Date.now() + 15_000);
-            void refresh();
-          }}
-        />
         <Costs v={v} />
       </aside>
 
@@ -628,6 +630,7 @@ function BeatRow({
   onChoose,
   patch,
   action,
+  lexicon,
 }: {
   b: BeatView;
   v: VideoView;
@@ -637,6 +640,7 @@ function BeatRow({
   onChoose: () => void;
   patch: (p: BeatPatch, ok?: string) => void;
   action: (a: "images" | "voice" | "rewrite", instruction?: string, ok?: string) => void;
+  lexicon: Lexicon;
 }) {
   const img = b.image ? v.images[b.image] : b.layout === "vinyl" && v.cover ? v.images[v.cover] : undefined;
   const busy = v.busy.includes(b.id) || Boolean(job);
@@ -670,7 +674,7 @@ function BeatRow({
           )}
         </span>
       </button>
-      {selected && <Inspector b={b} v={v} busy={busy} job={job} patch={patch} action={action} />}
+      {selected && <Inspector b={b} v={v} busy={busy} job={job} patch={patch} action={action} lexicon={lexicon} />}
     </div>
   );
 }
@@ -682,6 +686,7 @@ function Inspector({
   job,
   patch,
   action,
+  lexicon,
 }: {
   b: BeatView;
   v: VideoView;
@@ -689,6 +694,7 @@ function Inspector({
   job?: Job;
   patch: (p: BeatPatch, ok?: string) => void;
   action: (a: "images" | "voice" | "rewrite", instruction?: string, ok?: string) => void;
+  lexicon: Lexicon;
 }) {
   const [text, setText] = useState(b.text);
   useEffect(() => setText(b.text), [b.text]);
@@ -729,6 +735,11 @@ function Inspector({
             </button>
           </div>
         )}
+      </div>
+
+      <div className="grp">
+        <span className="lab">Prononciation · clique un mot</span>
+        <PronounceWords b={b} v={v} words={words} lexicon={lexicon} />
       </div>
 
       <div className="grp">

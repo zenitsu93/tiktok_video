@@ -303,3 +303,15 @@ body.resizing iframe { pointer-events: none; }
 .legal h1 { font-size: clamp(38px, 9vw, 60px); font-weight: 600; } .legal h1 span { font-weight: 200; }
 .legal h2 { font-size: 22px; margin-top: 8px; }
 .legal p, .legal ul { margin: 0; }
+
+/* pronunciation, on the word: a word with a rule shows its reading above it */
+.words.say { padding-top: 14px; row-gap: 18px; }
+.words.say button { position: relative; }
+.words.say button.rule { border-style: solid; border-color: var(--accent); color: var(--accent); }
+.words.say button.rule::after { content: attr(data-say); position: absolute; left: 50%; bottom: calc(100% + 1px); transform: translateX(-50%); font-size: 11px; text-transform: none; white-space: nowrap; color: var(--accent); pointer-events: none; }
+.words.say button[aria-expanded="true"] { border-style: solid; border-color: var(--ink); }
+.insp .phrase { justify-self: start; border: 0; background: none; padding: 0; font: inherit; font-size: 14px; color: var(--accent); cursor: pointer; text-align: left; }
+.say-pop { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--ink); border-radius: 10px; background: var(--paper); box-shadow: 0 8px 24px rgb(0 0 0 / 0.1); }
+.say-pop .r { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.say-pop .field { flex: 1; min-width: 0; font-size: 14px; padding: 6px 10px; border-radius: 8px; }
+.say-pop .field:first-child { flex: 0 1 38%; }
