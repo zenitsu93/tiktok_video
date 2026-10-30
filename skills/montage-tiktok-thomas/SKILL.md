@@ -141,6 +141,12 @@ N'utilise jamais `linear` ni `power1` pour un mouvement visible (seule exception
 - **Texte posé dans la carte** : pour un mot d'émotion, la ligne s'écrit en blanc dans le coin bas-gauche de l'image (marge ≈ 40 px, Regular + Black ≈ 92 px), sans ombre ni bandeau. Seulement sur une image assez sombre à cet endroit (contraste ≥ 4.5:1).
 - **Transition flou + flash gris** : la carte se floute d'un coup (`blur 14 px, scale 0.96`, 0.2 s, `inquick`), l'écran passe 3 images en gris très clair `#F2F2F2`, puis la carte suivante apparaît nette à la même place avec un léger zoom arrière. Pour un saut dans le temps ou un souvenir, au plus 1 fois par vidéo.
 
+**Variations relevées sur « Stranger in Moscow »** :
+- **Entrée par le coin haut droit** : la carte tombe en diagonale depuis le coin haut droit, coupée au début par le bord de l'écran (`x +620, y −620, rotation 6° → 0`, 0.45 s, `smooth`), pendant que le texte au-dessus se tape. À faire tourner avec les autres entrées.
+- **Illustration fantôme sous la carte** : un petit dessin au trait lié au sujet (personnage qui tombe, oiseau, note) apparaît sous la carte en gris très pâle (`opacity 0 → 0.28`) et dérive lentement vers le bas en tournant un peu (2 s, `sine.inOut`). Il ne porte pas l'information, il donne l'ambiance. Au plus 1 à 2 fois par vidéo.
+- **Étalonnage d'ambiance** : pour une chanson sombre ou mélancolique, toutes les images de la vidéo passent dans la même teinte, en général noir et blanc (`filter: grayscale(1) contrast(1.08)` sur les `<img>` et `<video>`). La pochette, le vinyle et la couverture gardent leurs couleurs. Décide-le une fois pour toute la vidéo, jamais une image sur deux.
+- **Moment musical sans texte** : quand la voix s'arrête et que la chanson joue (souvent 6 à 12 s vers la fin), aucun texte ; seule la carte reste et ses plans s'enchaînent en fondu (0.4 s) toutes les 1 à 1.5 s, avec un très léger zoom de la carte (`1 → 1.05`). Le texte reprend avec la voix.
+
 Règles de rythme :
 - Un nouvel élément (texte, carte ou changement de carte) **toutes les 1 à 2 s**. Une image reste rarement plus de 4 s, sauf une vidéo qui joue.
 - Les entrées d'images tombent **sur le mot** auquel elles correspondent dans la voix, pas avant.
