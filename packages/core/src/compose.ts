@@ -26,6 +26,8 @@ export interface Scene {
   /** Frame-accurate bounds, so joined scenes never drift from the voice. */
   startFrame: number;
   endFrame: number;
+  /** Vinyl scenes with a cover: the song, for the "bac à disques" cover that opens and closes the video. */
+  song?: { title: string; artist: string; hook: string };
 }
 
 export const sceneStart = (s: Scene) => s.startFrame / FPS;
@@ -48,13 +50,14 @@ export function buildScenes(doc: VideoDoc): { scenes: Scene[]; total: number } {
   const totalFrames = toFrame(total);
   // a scene opens 3 frames before its first word, so the image lands on the word
   const starts = groups.map((g, i) => (i === 0 ? 0 : Math.max(0, g.beats[0]!.startFrame - 3)));
-  const scenes = groups.map((g, i) => ({
+  const scenes: Scene[] = groups.map((g, i) => ({
     index: i,
     kind: g.kind,
     image: g.image,
     beats: g.beats,
     startFrame: starts[i]!,
     endFrame: i + 1 < groups.length ? starts[i + 1]! : totalFrames,
+    ...(g.kind === "vinyl" && g.image ? { song: { title: doc.title, artist: doc.artist, hook: groups[0]!.beats[0]!.text } } : {}),
   }));
   return { scenes: scenes.filter((s) => s.endFrame > s.startFrame), total: totalFrames / FPS };
 }
@@ -247,7 +250,12 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
     );
     js.push(`tl.fromTo("#${sid} .disc",{rotation:0},{rotation:${Math.round(160 * dur)},duration:${t3(dur)},ease:"none"},${t3(s0)});`);
     if (!cover) js.push(...entranceJs(`#${sid} .inner`, "pop", s0));
-    else js.push(...(scene.index === 0 ? sleeveIntroJs(sid, s0, dur) : sleeveOutroJs(sid, s0, dur)));
+    else {
+      // the "bac à disques" cover: complete on frame 0 (it is the TikTok cover) and again on the last frame (the loop)
+      const song = scene.song ?? { title: "", artist: "", hook: "" };
+      html.push(coverHtml(sid, song, s0, dur));
+      js.push(...(scene.index === 0 ? coverIntroJs(sid, s0, dur) : coverOutroJs(sid, s0, dur)));
+    }
   } else if (scene.kind === "mascot") {
     html.push(
       `<div id="${sid}" class="clip" data-start="${t3(s0)}" data-duration="${t3(dur)}" data-track-index="5">` +
@@ -258,6 +266,8 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
 
   // ---- text, one clip per beat
   scene.beats.forEach((b, k) => {
+    // the opening cover already shows the hook, the title and the artist while the voice says them
+    if (scene.kind === "vinyl" && scene.song && scene.index === 0) return;
     const bid = `${sid}${b.id}`;
     const start = k === 0 && scene.index === 0 ? s0 : Math.max(s0, local(b) - 0.02);
     const isLastInScene = k === scene.beats.length - 1;
@@ -340,40 +350,64 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
   return { html, js };
 }
 
-/**
- * "Pochette" opening (skill-tiktok/pochette/SPEC.md): the cover comes out of a blur, the record
- * slides out of it, then the cover flies off and the record takes the centre. A short hook shrinks the timings.
- */
-function sleeveIntroJs(sid: string, s0: number, dur: number): string[] {
+/** Kaneda Black Italic advance widths at 100 px, to fit the cover title to 840 px without measuring in the page. */
+const BLACK_IT_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ,.'’!?-&éèêàçùôîïëâÉÈÀ:()";
+const BLACK_IT_W = [
+  32, 33, 31, 33, 31, 21, 33, 33, 17, 17, 33, 17, 49, 33, 32, 33, 33, 24, 30, 21, 33, 30, 48, 31, 33, 29, 33, 34, 32, 34, 29, 28, 34, 34, 18, 32, 35, 27, 50,
+  37, 34, 33, 34, 34, 32, 30, 34, 32, 50, 33, 32, 31, 33, 23, 31, 32, 34, 32, 33, 30, 32, 33, 14, 17, 17, 17, 17, 17, 30, 25, 40, 31, 31, 31, 32, 31, 33, 32,
+  17, 17, 31, 32, 29, 29, 33, 17, 20, 20,
+];
+
+/** Cover title size: the title and its comma fill 840 px, never above 190 px. */
+export function coverTitleSize(title: string): number {
+  const w = [...`${title},`].reduce((sum, c) => sum + (BLACK_IT_W[BLACK_IT_CHARS.indexOf(c)] ?? 31), 0);
+  return Math.min(190, Math.floor((840 * 100) / Math.max(1, w)));
+}
+
+/** Hook, title (Black Italic) and artist, aligned left at 120 px (SPEC.md, « Couverture bac à disques »). */
+function coverHtml(sid: string, song: { title: string; artist: string; hook: string }, s0: number, dur: number): string {
+  const size = coverTitleSize(song.title);
+  return (
+    `<div id="${sid}c" class="clip" data-start="${t3(s0)}" data-duration="${t3(dur)}" data-track-index="6">` +
+    `<div class="cline" style="top:330px;font-size:68px">${esc(song.hook)}</div>` +
+    `<div class="cline it" style="top:1180px;font-size:${size}px;font-weight:700;line-height:1">${esc(song.title)},</div>` +
+    `<div class="cline" style="top:${1180 + Math.round(size * 0.95)}px;font-size:76px">de ${esc(song.artist)} ?</div></div>`
+  );
+}
+
+/** Opening: the cover holds (the record keeps sliding out), then the texts lift off, the sleeve flies away and the record shrinks to a dot. */
+function coverIntroJs(sid: string, s0: number, dur: number): string[] {
   const f = Math.min(1, dur / 2.2);
-  const at = (t: number) => t3(s0 + t * f);
+  const hold = Math.max(0.3, dur - 1.1 * f);
+  const at = (t: number) => t3(s0 + hold + t * f);
   const d = (t: number) => t3(t * f);
   return [
-    `tl.fromTo("#${sid} .sleeve",{scale:0.6,y:220,opacity:0,filter:"blur(24px)"},{scale:1,y:0,opacity:1,filter:"blur(0px)",duration:${d(0.75)},ease:"smooth"},${at(0)});`,
-    `tl.fromTo("#${sid} .inner",{opacity:0},{opacity:1,duration:0.01},${at(0.5)});`,
-    `tl.to("#${sid} .inner",{x:220,duration:${d(0.8)},ease:"smooth"},${at(0.55)});`,
-    `tl.to("#${sid} .sleeve",{x:-220,rotation:-4,duration:${d(0.8)},ease:"smooth"},${at(0.55)});`,
-    `tl.to("#${sid} .sleeve",{x:-1000,rotation:-16,opacity:0,duration:${d(0.6)},ease:"inquick"},${at(1.35)});`,
-    `tl.to("#${sid} .inner",{x:0,duration:${d(0.7)},ease:"inout"},${at(1.35)});`,
+    // fromTo, not set: a set at 0 is not drawn by seek(0), and frame 0 is the TikTok cover
+    `tl.fromTo("#${sid} .sleeve",{x:-120,rotation:-3,opacity:1},{x:-120,rotation:-3,opacity:1,duration:0.01},${t3(s0)});`,
+    `tl.fromTo("#${sid} .inner",{x:90},{x:130,duration:${t3(hold)},ease:"inout"},${t3(s0)});`,
+    `tl.to("#${sid}c .cline",{y:-40,opacity:0,filter:"blur(10px)",duration:${d(0.4)},ease:"inquick",stagger:${d(0.06)}},${at(0)});`,
+    `tl.to("#${sid} .sleeve",{x:-1000,rotation:-16,opacity:0,duration:${d(0.6)},ease:"inquick"},${at(0)});`,
+    `tl.to("#${sid} .inner",{x:0,duration:${d(0.7)},ease:"inout"},${at(0)});`,
+    `tl.to("#${sid} .stage",{scale:0,duration:${d(0.3)},ease:"inquick"},${at(0.75)});`,
   ];
 }
 
-/** "Pochette" ending: the cover comes back, the record slides into it, then everything shrinks to a dot. */
-function sleeveOutroJs(sid: string, s0: number, dur: number): string[] {
+/** Ending: the record pops in, the last line is said, then the cover comes back exactly as on frame 0 so the loop is seamless. */
+function coverOutroJs(sid: string, s0: number, dur: number): string[] {
   const g = Math.min(1.55, dur * 0.6) / 1.55;
   const e = s0 + dur;
   const at = (t: number) => t3(Math.max(s0, e - t * g));
   const d = (t: number) => t3(t * g);
+  // fromTo after the start: immediateRender:false, or they would blank the scene's first frame
   return [
+    `tl.fromTo("#${sid} .sleeve",{x:-1000,rotation:-16,opacity:0},{x:-1000,rotation:-16,opacity:0,duration:0.01},${t3(s0)});`,
+    `tl.fromTo("#${sid}c .cline",{opacity:0},{opacity:0,duration:0.01},${t3(s0)});`,
     `tl.fromTo("#${sid} .stage",{scale:0},{scale:1.06,duration:0.3,ease:"back.out(1.6)"},${t3(s0)});`,
     `tl.to("#${sid} .stage",{scale:1,duration:0.18,ease:"smooth"},${t3(s0 + 0.3)});`,
-    `tl.set("#${sid} .sleeve",{opacity:0},${t3(s0)});`,
     `tl.to("[id^='${sid}b'] .tinner",{y:-40,opacity:0,filter:"blur(10px)",duration:${d(0.4)},ease:"inquick"},${at(1.55)});`,
-    `tl.fromTo("#${sid} .sleeve",{x:-1000,rotation:-16,opacity:0},{x:-220,rotation:-4,opacity:1,duration:${d(0.5)},ease:"smooth"},${at(1.55)});`,
-    `tl.to("#${sid} .inner",{x:220,duration:${d(0.45)},ease:"inout"},${at(1.55)});`,
-    `tl.to("#${sid} .inner",{x:0,duration:${d(0.42)},ease:"inquick"},${at(1)});`,
-    `tl.to("#${sid} .sleeve",{x:0,rotation:0,duration:${d(0.42)},ease:"inquick"},${at(1)});`,
-    `tl.to("#${sid} .stage",{scale:0,duration:${d(0.3)},ease:"inquick"},${at(0.45)});`,
+    `tl.to("#${sid} .sleeve",{x:-120,rotation:-3,opacity:1,duration:${d(0.5)},ease:"smooth"},${at(1.55)});`,
+    `tl.to("#${sid} .inner",{x:90,duration:${d(0.5)},ease:"inout"},${at(1.55)});`,
+    `tl.fromTo("#${sid}c .cline",{y:40,opacity:0,filter:"blur(10px)"},{y:0,opacity:1,filter:"blur(0px)",duration:${d(0.5)},ease:"smooth",stagger:${d(0.08)},immediateRender:false},${at(1.2)});`,
   ];
 }
 
@@ -496,6 +530,7 @@ html, body { width:${W}px; height:${H}px; overflow:hidden; background:#ffffff; }
 .kline { line-height:.95; white-space:nowrap; }
 .w { display:inline-block; white-space:nowrap; }
 .it { font-style:italic; }
+.cline { position:absolute; left:120px; font-weight:400; white-space:nowrap; }
 </style>
 ${o.extraHead ?? ""}
 </head>
