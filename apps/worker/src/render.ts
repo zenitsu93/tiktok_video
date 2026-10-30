@@ -64,7 +64,7 @@ async function cachedScene(hash: string) {
 
 /**
  * Renders into the cache, ahead of the export, the scenes it will need: while Thomas checks
- * the shots, they are made one by one, so « Monter la vidéo » only has the changed ones left.
+ * the shots, they are made one by one, so « Envoyer sur TikTok » only has the changed ones left.
  * Only this server's time: no model, no paid API. Stops between two scenes as soon as
  * `keepGoing` says no (the document changed, or the export started and takes over).
  */

@@ -1,11 +1,12 @@
 import { applyBeatPatch, beatContext, FPS, spokenText, timeBeats, voiceStale, type Asset, type Beat, type VideoDoc } from "@regie/core";
 import { createTikTokSend, getAsset, getDb, getVideo, lastTikTokSend, mutateDoc, pronunciationLexicon, setBusy, setError, setProgress, setRendered, setStatus, tiktokSendInFlight } from "@regie/db";
 import { BudgetError, enqueue, env, JOBS, providers, storage, tiktokConfigured, tiktokConnected } from "@regie/server";
+import { randomInt } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import pLimit from "p-limit";
 import { hasChecker, removeBackground, removeChecker } from "./background";
-import { takeCuts, toBeats } from "./beats";
+import { drawStyle, takeCuts, toBeats } from "./beats";
 import { animatedGif, ff, ingestClip, ingestImage, ingestVoice, sliceTake, storeFile, withTemp } from "./media";
 import { editBeat, splitScript, writeCaption, writeScript } from "./providers/claude";
 import { demoCaption, demoImages, demoScript, demoSplit, demoVoice } from "./providers/demo";
@@ -234,9 +235,15 @@ export async function generate(videoId: string) {
       return;
     }
     await setProgress(db(), videoId, { step: "Découpage en plans", done: 0, total: 1 });
-    const rows = claude ? await splitScript(videoId, script) : script === demo!.beats.map((b) => b.text).join(" ") ? demo!.beats : demoSplit(script);
-    beats = toBeats(rows);
-    await mutateDoc(db(), videoId, "script", (d) => ({ ...d, beats, sources, draft: null }));
+    const split = claude
+      ? await splitScript(videoId, script)
+      : { beats: script === demo!.beats.map((b) => b.text).join(" ") ? demo!.beats : demoSplit(script), mood: "lumineux" as const };
+    // the video's own draw: where the entrances start, which lines stress how, black and white for a dark story
+    const seed = randomInt(1, 1_000_000);
+    const { zoom, exit } = drawStyle(seed);
+    const look = { seed, mono: split.mood === "sombre", zoom, exit };
+    beats = toBeats(split.beats, look.seed);
+    await mutateDoc(db(), videoId, "script", (d) => ({ ...d, beats, look, sources, draft: null }));
   }
 
   // voice: the whole script in one take when nothing is voiced yet
@@ -315,12 +322,12 @@ export async function generate(videoId: string) {
     const message = `Pas d'images pour ${missing.length} ${missing.length > 1 ? "idées" : "idée"}, à partir de ${missing[0]?.[0] ?? first.beats[0]}. ${first.error.message}`;
     if (!(first.error instanceof BudgetError)) throw new Error(message);
     // over budget the video is not stuck: Thomas puts his own pictures on those lines (free), then mounts it
-    notice = `${message} Mets tes propres images avec « Ma photo » dans ces plans, puis « Monter la vidéo ».`;
+    notice = `${message} Mets tes propres images avec « Ma photo » dans ces plans, puis « Envoyer sur TikTok ».`;
   }
   if (!(await load(videoId)).doc.cover) await coverFor(videoId);
   // a caption that fails does not hold the video back: the « Écrire la légende » button retries it
   if (!(await load(videoId)).doc.caption) await caption(videoId).catch((e) => console.warn("[légende]", (e as Error).message));
-  // the montage waits for Thomas too: he checks the shots, then « Monter la vidéo » (which then goes to TikTok);
+  // the montage waits for Thomas too: he checks the shots, then « Envoyer sur TikTok » (which makes the file, then sends it);
   // meanwhile the scenes are made ahead, so that click has little left to do
   await setStatus(db(), videoId, "ready", null, notice);
   // by hand, the scenes are made ahead as the pictures come in (each « Ma photo » starts it)

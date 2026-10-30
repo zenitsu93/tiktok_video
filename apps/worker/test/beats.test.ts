@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balanceRows, takeCuts, toBeats, type Row } from "../src/beats";
+import { balanceRows, drawStyle, pickMoves, pickPlaces, takeCuts, toBeats, type Row } from "../src/beats";
 
 const text = (t: string, hero = ""): Row => ({ text: t, hero, layout: "text", imageQuery: { kind: "none", queries: [] } });
 const card = (t: string, q: string): Row => ({ text: t, hero: "", layout: "card", imageQuery: { kind: "pinterest", queries: [q] } });
@@ -64,5 +64,72 @@ describe("toBeats", () => {
       { ...card("pour toujours", "c"), italic: true },
     ];
     expect(toBeats(rows).map((b) => b.italic)).toEqual([true, false, false, true]);
+  });
+});
+
+describe("gestures and placements", () => {
+  const story = (): Row[] => [
+    card("le paravent lui tombe", "a"),
+    card("sur la tête", "b"),
+    text("En 1990,", "1990"),
+    card("son secret le plus intime", "c"),
+    card("reste caché", "c"),
+    card("son cœur va se briser", "d"),
+    text("Pourtant,"),
+    card("chaque soir", "e"),
+    card("il chante", "f"),
+    text("Franchement,"),
+  ];
+
+  it("keeps a gesture only where it can play, spaced out, never twice in a row", () => {
+    const rows = story();
+    rows[0]!.move = "fall";
+    rows[1]!.move = "fall"; // too close
+    rows[3]!.move = "fall"; // not the last line of its picture
+    rows[4]!.move = "mystery";
+    rows[2]!.move = "shatter"; // a text-only line cannot break
+    rows[8]!.move = "mystery"; // same as the last one kept
+    const moves = pickMoves(rows);
+    expect(moves[0]).toBe("fall");
+    expect(moves[1]).toBe("none");
+    expect(moves[2]).toBe("none");
+    expect(moves[3]).toBe("none");
+    expect(moves[4]).toBe("mystery");
+    expect(moves[8]).toBe("none");
+  });
+
+  it("fades a card into the white at a chapter end when the reading gave almost no gesture", () => {
+    const moves = pickMoves(story());
+    expect(moves.filter((m) => m === "evaporate").length).toBeGreaterThan(0);
+    moves.forEach((m, i) => m === "evaporate" && expect(story()[i + 1]!.layout).toBe("text"));
+  });
+
+  it("moves text-only lines around the screen, never twice to the same spot in a row", () => {
+    const rows = Array.from({ length: 12 }, (_, i) => text(`ligne ${i}`));
+    const { places } = pickPlaces(rows, 3);
+    expect(places.filter((p) => p !== "hero").length).toBeGreaterThan(3);
+    places.slice(1).forEach((p, i) => expect(p).not.toBe(places[i]));
+  });
+
+  it("keeps one text zone per picture and varies it from picture to picture", () => {
+    const rows = Array.from({ length: 16 }, (_, i) => card(`idée ${i >> 1}`, `q${i >> 1}`));
+    const { zones } = pickPlaces(rows, 11);
+    for (let i = 0; i < rows.length; i += 2) expect(zones[i + 1]).toBe(zones[i]);
+    expect(new Set(zones).size).toBeGreaterThan(1);
+  });
+
+  it("draws a different language for different videos", () => {
+    const styles = [1, 2, 3, 4, 5, 6].map((s) => drawStyle(s));
+    expect(new Set(styles.map((s) => s.entrances.join())).size).toBe(6);
+    expect(new Set(styles.map((s) => `${s.zoom}/${s.exit}/${s.zones[0]![0]}`)).size).toBeGreaterThan(1);
+  });
+
+  it("gives every video its own sequence of entrances", () => {
+    const rows = Array.from({ length: 6 }, (_, i) => card(`idée ${i}`, `q${i}`));
+    const a = toBeats(rows, 0).map((b) => b.entrance);
+    const b = toBeats(rows, 5).map((b) => b.entrance);
+    expect(a[0]).toBe("right");
+    expect(b).not.toEqual(a);
+    expect(new Set(b).size).toBe(6);
   });
 });

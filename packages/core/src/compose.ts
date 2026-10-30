@@ -1,4 +1,4 @@
-import type { Asset, Beat, Entrance, VideoDoc } from "./schema";
+import type { Asset, Beat, Entrance, Move, VideoDoc } from "./schema";
 import { FPS, round, timeBeats, toFrame, type TimedBeat } from "./timing";
 
 /**
@@ -28,6 +28,8 @@ export interface Scene {
   endFrame: number;
   /** Vinyl scenes with a cover: the song, for the "bac à disques" cover that opens and closes the video. */
   song?: { title: string; artist: string; hook: string };
+  /** The video's look (seed, black and white, zoom and exits), when it has one. */
+  look?: VideoDoc["look"];
 }
 
 export const sceneStart = (s: Scene) => s.startFrame / FPS;
@@ -36,11 +38,13 @@ export const sceneDuration = (s: Scene) => (s.endFrame - s.startFrame) / FPS;
 export function buildScenes(doc: VideoDoc): { scenes: Scene[]; total: number } {
   const { beats, total } = timeBeats(doc);
   const groups: { kind: SceneKind; image: string | null; beats: TimedBeat[] }[] = [];
+  const full = (b: Beat | undefined) => b?.move === "fullscreen";
   for (const b of beats) {
     const kind = b.layout as SceneKind;
     const image = kind === "vinyl" ? doc.cover : kind === "card" || kind === "cutout" ? b.image : null;
     const prev = groups.at(-1);
-    const joinable = kind === "card" || kind === "cutout" || kind === "vinyl" || kind === "mascot";
+    // a full screen is its own scene: it cuts in and out of the white
+    const joinable = (kind === "card" || kind === "cutout" || kind === "vinyl" || kind === "mascot") && !full(b) && !full(prev?.beats[0]);
     if (prev && joinable && prev.kind === kind && prev.image === image) {
       prev.beats.push(b);
     } else {
@@ -58,6 +62,7 @@ export function buildScenes(doc: VideoDoc): { scenes: Scene[]; total: number } {
     startFrame: starts[i]!,
     endFrame: i + 1 < groups.length ? starts[i + 1]! : totalFrames,
     ...(g.kind === "vinyl" && g.image ? { song: { title: doc.title, artist: doc.artist, hook: groups[0]!.beats[0]!.text } } : {}),
+    ...(doc.look ? { look: doc.look } : {}),
   }));
   return { scenes: scenes.filter((s) => s.endFrame > s.startFrame), total: totalFrames / FPS };
 }
@@ -92,6 +97,8 @@ const TEXT_DIRS: Record<Entrance, [Dir, Dir]> = {
   zoomin: ["zoom", "bottom"],
   glide: ["left", "right"],
   grow: ["bottom", "zoom"],
+  arc: ["left", "bottom"],
+  corner: ["top", "zoom"],
 };
 const FOLLOW_DIRS: [Dir, Dir][] = [
   ["bottom", "zoom"],
@@ -133,10 +140,42 @@ function entranceJs(sel: string, e: Entrance, t: number): string[] {
       return [`tl.fromTo("${sel}",{x:-760,scale:0.6,rotation:-8},{x:0,scale:1,rotation:0,duration:0.5,ease:"smooth"},${T});`];
     case "glide":
       return [`tl.fromTo("${sel}",{x:-500,y:250},{x:0,y:0,duration:0.45,ease:"smooth"},${T});`];
+    case "arc":
+      // small and tilted from the bottom left, through a midpoint, then straightens into place
+      return [
+        `tl.fromTo("${sel}",{x:-260,y:420,rotation:-9,scale:0.55},{x:-70,y:90,rotation:-3,scale:0.88,duration:0.18,ease:"smooth"},${T});`,
+        `tl.to("${sel}",{x:0,y:0,rotation:0,scale:1,duration:0.35,ease:"smooth"},${t3(t + 0.18)});`,
+      ];
+    case "corner":
+      return [`tl.fromTo("${sel}",{x:620,y:-620,rotation:6},{x:0,y:0,rotation:0,duration:0.45,ease:"smooth"},${T});`];
   }
 }
 
-type Run = { cls: "light" | "bold" | "hero" | "spoken" | "spokenb"; text: string; it?: boolean };
+/** Text-only screens off centre: one spot per corner of the TikTok safe zone. */
+const CORNERS: Partial<Record<NonNullable<Beat["place"]>, string>> = {
+  topright: "top:330px;justify-content:flex-end;padding-right:90px",
+  topleft: "top:330px;justify-content:flex-start;padding-left:90px",
+  bottomleft: "top:1150px;justify-content:flex-start;padding-left:90px",
+  bottomright: "top:1150px;justify-content:flex-end;padding-right:90px",
+};
+
+/** A cut-out born from a blur: a memory, a ghost, something unreal. */
+function ghostJs(sel: string, t: number): string[] {
+  return [`tl.fromTo("${sel}",{scale:1.08,opacity:0,filter:"blur(30px)"},{scale:1,opacity:1,filter:"blur(0px)",duration:0.9,ease:"smooth"},${t3(t)});`];
+}
+
+/** Four pieces that share the card, for « shatter ». */
+const SHARDS = [
+  "polygon(0 0,60% 0,42% 52%,0 44%)",
+  "polygon(60% 0,100% 0,100% 50%,42% 52%)",
+  "polygon(0 44%,42% 52%,56% 100%,0 100%)",
+  "polygon(42% 52%,100% 50%,100% 100%,56% 100%)",
+];
+const SHARD_TO = ["{x:-400,y:-360,rotation:-30", "{x:400,y:-360,rotation:30", "{x:-400,y:380,rotation:24", "{x:400,y:380,rotation:-24"];
+
+type Run = { cls: "light" | "bold" | "hero" | "spoken" | "spokenb" | "small" | "big" | "key"; text: string; it?: boolean };
+/** The run that carries the stress: it takes the accent colour, the italic and its own entrance. */
+const isKey = (cls: Run["cls"]) => cls === "hero" || cls === "spokenb" || cls === "big" || cls === "key";
 
 /** Splits a beat into styled runs around its hero word. */
 export function textRuns(beat: Beat, spoken: boolean): { rows: Run[][]; heroOffset: number } {
@@ -144,7 +183,7 @@ export function textRuns(beat: Beat, spoken: boolean): { rows: Run[][]; heroOffs
   if (!beat.italic) return out;
   // one italic element per screen: the hero when there is one, otherwise the line, in Light Italic
   const runs = out.rows.flat();
-  const hero = runs.find((r) => r.cls === "hero" || r.cls === "spokenb");
+  const hero = runs.find((r) => isKey(r.cls));
   if (hero) hero.it = true;
   else for (const r of runs) {
     r.it = true;
@@ -174,6 +213,14 @@ function plainRuns(beat: Beat, spoken: boolean): { rows: Run[][]; heroOffset: nu
   let after = text.slice(at + hero.length);
   const punct = /^[,.;:?!…]+/.exec(after)?.[0] ?? "";
   after = after.slice(punct.length).trim();
+  // small + big in one Regular weight, or one Regular line with the key word in Black: a single row
+  if (beat.place === "size" || beat.place === "inline") {
+    const runs: Run[] = [];
+    if (before) runs.push({ cls: "small", text: before });
+    runs.push({ cls: beat.place === "size" ? "big" : "key", text: text.slice(at, at + hero.length) + punct });
+    if (after) runs.push({ cls: "small", text: after });
+    return { rows: [runs], heroOffset: at };
+  }
   const heroRun: Run = { cls: "hero", text: text.slice(at, at + hero.length) + punct };
   const rows: Run[][] = [];
   const beforeWords = before ? before.split(/\s+/).length : 0;
@@ -209,37 +256,122 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
   const accent = asset?.accent ?? null;
 
   // ---- visual: card / cutout / vinyl / mascot
+  const seed = scene.look?.seed ?? 0;
+  const mono = Boolean(scene.look?.mono);
+  const last = scene.beats.at(-1)!;
+  const movesIn = new Set<Move>(scene.beats.map((b) => b.move ?? "none"));
   let textTop: number | null = null;
   let textLeft: number | null = null;
+  /** Text above the card: its bottom edge. Text aligned on the card's right edge: the space on its right. */
+  let textBottom: number | null = null;
+  let textRight: number | null = null;
+  /** Text beside a portrait card: its column and the card's height, to centre on it. */
+  let side: { left: number; top: number; h: number } | null = null;
+  const fullscreen = first.move === "fullscreen" && scene.kind === "card";
+  /** Card gone before the scene ends (fell or broke): no exit to play. */
+  let gone = false;
   if ((scene.kind === "card" || scene.kind === "cutout") && scene.image && asset) {
     const iw = asset.width ?? 1000;
     const ih = asset.height ?? 1250;
-    let w = scene.kind === "cutout" ? 560 : 710;
-    let h = Math.round((w * ih) / iw);
-    if (h > 760) {
-      h = 760;
-      w = Math.round((h * iw) / ih);
-    }
-    const left = Math.round((W - w) / 2);
-    const top = CARD_CY - Math.round(h / 2);
     // a clip (GIF or video) always plays in a card, muted; the renderer times it from the scene's wrapper
     const clip = asset.kind === "video";
     const cls = scene.kind === "card" || clip ? "card" : "cut";
-    textTop = top + h + 46;
-    textLeft = cls === "card" ? left : null;
-    const media = clip ? `<video src="${esc(ctx.src(scene.image))}" muted playsinline preload="auto"></video>` : `<img src="${esc(ctx.src(scene.image))}" alt="">`;
-    html.push(
-      `<div id="${sid}" class="clip" data-start="${t3(s0)}" data-duration="${t3(dur)}" data-track-index="${1 + (scene.index % 2)}">` +
-        `<div class="inner" style="left:${left}px;top:${top}px;width:${w}px;height:${h}px">` +
-        `<div class="${cls}">${media}</div></div></div>`,
-    );
-    js.push(...entranceJs(`#${sid} .inner`, first.entrance, s0));
-    // soft zoom on the picture for the whole hold, alternating in and out (a clip moves on its own)
-    const [z0, z1] = scene.index % 2 === 0 ? [1, 1.12] : [1.12, 1];
-    const zc = scene.kind === "cutout" ? [1, 1.05] : [z0, z1];
-    if (!clip) js.push(`tl.fromTo("#${sid} img",{scale:${zc[0]}},{scale:${zc[1]},duration:${t3(dur)},ease:"sine.inOut"},${t3(s0)});`);
-    // collapse to a point at the end of the idea (every other scene, the rest cut to white)
-    if (dur > 0.9 && scene.index % 2 === 0) {
+    const src = esc(ctx.src(scene.image));
+    const media = clip ? `<video src="${src}" muted playsinline preload="auto"></video>` : `<img src="${src}" alt="">`;
+    const mediaSel = `#${sid} .${fullscreen ? "full" : cls} ${clip ? "video" : "img"}`;
+    if (fullscreen) {
+      // the key moment: the picture fills the screen, no card, a slow zoom out; hard cut in and out
+      html.push(
+        `<div id="${sid}" class="clip" data-start="${t3(s0)}" data-duration="${t3(dur)}" data-track-index="${1 + (scene.index % 2)}">` +
+          `<div class="inner" style="left:0;top:0;width:${W}px;height:${H}px"><div class="full">${media}<div class="shade"></div></div></div></div>`,
+      );
+      if (!clip) js.push(`tl.fromTo("${mediaSel}",{scale:1.12},{scale:1,duration:${t3(dur)},ease:"sine.out"},${t3(s0)});`);
+      textTop = 1180;
+      textLeft = 90;
+    } else {
+      let w = scene.kind === "cutout" ? 560 : 710;
+      let h = Math.round((w * ih) / iw);
+      if (h > 760) {
+        h = 760;
+        w = Math.round((h * iw) / ih);
+      }
+      let left = Math.round((W - w) / 2);
+      // a portrait picture can sit on the left with its text beside it; a landscape one keeps its text under
+      if (first.place === "side" && cls === "card" && ih / iw >= 1.15) {
+        w = 420;
+        h = Math.min(640, Math.round((w * ih) / iw));
+        left = 90;
+      }
+      const zone = first.zone ?? "under";
+      const isSide = first.place === "side" && w === 420 && left === 90;
+      const above = !isSide && cls === "card" && (zone === "above" || zone === "aboveright");
+      // text above: the card sits lower to leave it the top of the screen
+      const top = CARD_CY + (above ? 170 : 0) - Math.round(h / 2);
+      if (isSide) side = { left: left + w + 44, top, h };
+      if (above) textBottom = H - top + 40;
+      else textTop = top + h + 46;
+      textLeft = cls === "card" ? left : null;
+      if (cls === "card" && !isSide && (zone === "underright" || zone === "aboveright")) {
+        textRight = W - (left + w);
+        textLeft = null;
+      }
+      const shards =
+        movesIn.has("shatter") && cls === "card" && !clip
+          ? SHARDS.map((poly, i) => `<div class="card shard sh${i}" style="clip-path:${poly};opacity:0">${media}</div>`).join("")
+          : "";
+      html.push(
+        `<div id="${sid}" class="clip" data-start="${t3(s0)}" data-duration="${t3(dur)}" data-track-index="${1 + (scene.index % 2)}">` +
+          `<div class="inner" style="left:${left}px;top:${top}px;width:${w}px;height:${h}px">` +
+          `<div class="${cls}">${media}</div>${shards}</div></div>`,
+      );
+      if (first.move === "ghost" && scene.kind === "cutout") js.push(...ghostJs(`#${sid} .inner`, s0));
+      else js.push(...entranceJs(`#${sid} .inner`, first.entrance, s0));
+      // soft zoom on the picture for the whole hold, alternating in and out (a clip moves on its own)
+      const mode = scene.look?.zoom ?? "alt";
+      const zoomIn = mode === "in" || mode === "push" || (mode === "alt" && (scene.index + seed) % 2 === 0);
+      const far = mode === "push" ? 1.2 : 1.12;
+      const zoom = scene.kind === "cutout" ? [1, 1.05] : zoomIn ? [1, far] : [far, 1];
+      if (!clip) js.push(`tl.fromTo("#${sid} .${cls} img",{scale:${zoom[0]}},{scale:${zoom[1]},duration:${t3(dur)},ease:"sine.inOut"},${t3(s0)});`);
+    }
+
+    // gestures that tell a line, on its hero word (or its first word when it has none)
+    scene.beats.forEach((b, k) => {
+      const m = b.move ?? "none";
+      if (m === "none" || fullscreen) return;
+      const t0 = local(b);
+      const speak = Math.max(0.3, b.end - b.start);
+      const at = b.hero ? b.text.toLowerCase().indexOf(b.hero.toLowerCase()) : -1;
+      const tHero = at > 0 ? t0 + speak * (at / Math.max(1, b.text.length)) : t0 + 0.15;
+      const isLast = k === scene.beats.length - 1;
+      if (m === "mystery") {
+        const blur = mono ? "grayscale(1) contrast(1.08) blur(10px)" : "blur(10px)";
+        js.push(`tl.to("${mediaSel}",{filter:"${blur}",duration:0.6,ease:"sine.inOut"},${t3(t0 + 0.1)});`);
+      } else if (m === "fall" && isLast) {
+        // lifts a little, then tips over and falls out of frame on the word
+        js.push(`tl.to("#${sid} .inner",{y:-30,rotation:-3,duration:0.25,ease:"smooth",transformOrigin:"100% 100%"},${t3(tHero)});`);
+        js.push(`tl.to("#${sid} .inner",{y:1150,x:260,rotation:24,opacity:0,duration:0.5,ease:"inquick"},${t3(tHero + 0.25)});`);
+        gone = true;
+      } else if (m === "shatter" && isLast && cls === "card" && !clip) {
+        // the pieces are cards too: their pictures zoom with the whole one, so the break is seamless
+        js.push(`tl.fromTo("#${sid} .shard",{opacity:0},{opacity:1,duration:0.01,immediateRender:false},${t3(tHero)});`);
+        js.push(`tl.fromTo("#${sid} .card:not(.shard)",{opacity:1},{opacity:0,duration:0.01,immediateRender:false},${t3(tHero)});`);
+        SHARD_TO.forEach((to, i) =>
+          js.push(`tl.to("#${sid} .sh${i}",${to},opacity:0,duration:0.4,ease:"inquick"},${t3(tHero + 0.02 + i * 0.02)});`),
+        );
+        gone = true;
+      }
+    });
+
+    // end of the idea: a gesture, or collapse to a point every other scene (the rest cut to white)
+    const lastMove = last.move ?? "none";
+    if (fullscreen || gone) {
+      // hard cut, or the card already left
+    } else if (lastMove === "evaporate" && dur > 1.2) {
+      js.push(`tl.to("#${sid} .inner",{opacity:0,filter:"brightness(1.6) blur(4px)",scale:1.03,duration:0.6,ease:"inout"},${t3(s0 + dur - 0.62)});`);
+    } else if (first.move === "ghost" && scene.kind === "cutout" && dur > 0.9) {
+      // the ghost leaves sliced on a slant
+      js.push(`tl.fromTo("#${sid} .inner",{clipPath:"polygon(0 0,100% 0,100% 100%,0 100%)"},{clipPath:"polygon(0 0,100% 0,100% 0%,0 30%)",duration:0.3,ease:"inquick",immediateRender:false},${t3(s0 + dur - 0.32)});`);
+    } else if (dur > 0.9 && scene.look?.exit !== "cut" && (scene.look?.exit === "point" || (scene.index + seed) % 2 === 0)) {
       js.push(`tl.to("#${sid} .inner",{scale:0,duration:0.15,ease:"inquick"},${t3(s0 + dur - 0.17)});`);
     }
   } else if (scene.kind === "vinyl") {
@@ -280,7 +412,10 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
     const tdur = Math.max(0.05, endAbs - start);
     const speak = Math.max(0.3, b.end - b.start);
     const t0 = local(b);
-    const color = b.accent && accent ? accent : INK;
+    // over a full screen picture the text is white
+    const ink = fullscreen ? "#ffffff" : INK;
+    const grey = fullscreen ? "rgba(255,255,255,0.45)" : GREY;
+    const color = b.accent && accent && !fullscreen ? accent : ink;
 
     if (scene.kind === "kinetic") {
       html.push(kineticHtml(bid, b, start, tdur, k));
@@ -297,9 +432,23 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
       if (k > 0) blockCls += " title";
     }
     else if (scene.kind === "mascot") pos = "top:880px";
-    else if (textTop !== null) pos = `top:${textTop}px`;
-    else pos = "top:0;bottom:0;align-items:center";
-    if (textLeft !== null) {
+    else if (side) {
+      // beside the portrait card, centred on its height
+      pos = `top:${side.top}px;height:${side.h}px;align-items:center;justify-content:flex-start;padding-left:${side.left}px;padding-right:60px`;
+      blockCls += " side";
+    } else if (textTop !== null || textBottom !== null) {
+      pos = textTop !== null ? `top:${textTop}px` : `bottom:${textBottom}px;align-items:flex-end`;
+      if (textRight !== null) {
+        pos += `;justify-content:flex-end;padding-right:${textRight}px;padding-left:60px`;
+        blockCls += " right";
+      }
+    } else if (b.place && CORNERS[b.place]) {
+      pos = CORNERS[b.place]!;
+      blockCls += b.place.endsWith("right") ? " corner right" : " corner";
+    } else pos = "top:0;bottom:0;align-items:center";
+    if (side || blockCls.includes(" corner") || textRight !== null) {
+      // placed off centre: already aligned
+    } else if (textLeft !== null) {
       pos += `;justify-content:flex-start;padding-left:${textLeft}px;padding-right:60px`;
     } else blockCls += " center";
 
@@ -309,7 +458,7 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
           `<div class="row">${row
             .map((r, ri) => {
               // never italic and accent colour on the same word
-              const style = (r.cls === "hero" || r.cls === "spokenb") && !r.it ? ` style="color:${color}"` : "";
+              const style = isKey(r.cls) && !r.it ? ` style="color:${color}"` : "";
               return `<span class="part ${r.cls}${r.it ? " it" : ""} p${ri}"${style}>${chars(r.text)}</span>`;
             })
             .join("")}</div>`,
@@ -331,22 +480,24 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
     rows.flat().forEach((r) => {
       const tPart = t0 + speak * (offset / Math.max(1, total));
       const partSel = `#${bid} .part.${r.cls}`;
-      const dir = r.cls === "hero" ? dirHero : dirText;
+      const dir = isKey(r.cls) && r.cls !== "spokenb" ? dirHero : dirText;
       if (!spoken) js.push(`tl.fromTo("${partSel}",${DIR_FROM[dir]},{x:0,y:0,scale:1,opacity:1,duration:0.45,ease:"smooth"},${t3(tPart)});`);
-      const target = (r.cls === "hero" || r.cls === "spokenb") && !r.it ? color : INK;
+      const target = isKey(r.cls) && !r.it ? color : ink;
       if (b.reveal === "fade") {
         js.push(`tl.fromTo("${partSel} .ch",{opacity:0},{opacity:1,duration:0.01},${t3(start)});`);
-        js.push(`tl.fromTo("${partSel} .ch",{color:"${GREY}"},{color:"${target}",duration:0.15},${t3(tPart)});`);
+        js.push(`tl.fromTo("${partSel} .ch",{color:"${grey}"},{color:"${target}",duration:0.15},${t3(tPart)});`);
       } else {
         const n = Math.max(1, r.text.replace(/\s/g, "").length);
         const partSpeak = speak * (r.text.length / Math.max(1, total));
         const stg = round((partSpeak * 0.92) / n, 10000);
-        js.push(`tl.fromTo("${partSel} .ch",{opacity:0,color:"${GREY}"},{opacity:1,color:"${target}",duration:0.06,stagger:${stg}},${t3(tPart)});`);
+        js.push(`tl.fromTo("${partSel} .ch",{opacity:0,color:"${grey}"},{opacity:1,color:"${target}",duration:0.06,stagger:${stg}},${t3(tPart)});`);
       }
       offset += r.text.length + 1;
     });
     // make room: the card rises a little when its first line arrives
-    if (k === 0 && (scene.kind === "card" || scene.kind === "cutout") && first.entrance !== "rise" && first.entrance !== "drop") {
+    // (not after an entrance that already moves it up or down, nor under a full screen, nor before a fall)
+    const settled = ["rise", "drop", "arc", "corner"].includes(first.entrance) || fullscreen || movesIn.has("fall") || first.move === "ghost";
+    if (k === 0 && (scene.kind === "card" || scene.kind === "cutout") && !settled) {
       js.push(`tl.fromTo("#${sid} .inner",{y:90},{y:0,duration:0.25,ease:"smooth"},${t3(Math.max(s0 + 0.35, t0 + 0.05))});`);
     }
   });
@@ -481,6 +632,8 @@ export interface DocumentOptions {
   audio?: string;
   extraHead?: string;
   extraBody?: string;
+  /** Every picture in black and white (the video's look); cover, sleeve and record keep their colours. */
+  mono?: boolean;
 }
 
 function documentHtml(parts: Parts, o: DocumentOptions): string {
@@ -535,14 +688,30 @@ html, body { width:${W}px; height:${H}px; overflow:hidden; background:#ffffff; }
 .kline { line-height:.95; white-space:nowrap; }
 .w { display:inline-block; white-space:nowrap; }
 .it { font-style:italic; }
+.full { position:absolute; inset:0; overflow:hidden; }
+.full img, .full video { width:100%; height:100%; object-fit:cover; display:block; }
+.shade { position:absolute; inset:0; background:linear-gradient(180deg,rgba(0,0,0,0) 45%,rgba(0,0,0,.55) 100%); }
+.shard { position:absolute; inset:0; }
+.small { font-weight:400; font-size:64px; line-height:1; }
+.big { font-weight:400; font-size:118px; line-height:.9; }
+.key { font-weight:700; font-size:64px; line-height:1; }
+.block.right { align-items:flex-end; text-align:right; }
+.block.right .row { justify-content:flex-end; }
+.corner .hero { font-size:130px; }
+.corner .light, .corner .bold { font-size:62px; }
+.side { max-width:500px; }
+.side .hero { font-size:120px; }
+.side .light, .side .bold, .side .small, .side .key { font-size:56px; }
+.side .big { font-size:92px; }
+.mono .card img, .mono .card video, .mono .cut img, .mono .full img, .mono .full video { filter:grayscale(1) contrast(1.08); }
 .cline { position:absolute; left:120px; font-weight:400; white-space:nowrap; }
 /* own layer for everything GSAP moves or scales: without it Chrome snaps text to whole pixels and it shakes. Never on .ch */
-.inner, .card img, .cut img, .disc, .stage, .sleeve, .tinner, .block, .part, .kline, .cline { will-change:transform; }
+.inner, .card img, .cut img, .full img, .disc, .stage, .sleeve, .tinner, .block, .part, .kline, .cline { will-change:transform; }
 </style>
 ${o.extraHead ?? ""}
 </head>
 <body>
-<div id="root" data-composition-id="main" data-start="0" data-duration="${t3(o.duration)}" data-width="${W}" data-height="${H}" data-fps="${FPS}" data-layout-allow-overlap>
+<div id="root"${o.mono ? ' class="mono"' : ""} data-composition-id="main" data-start="0" data-duration="${t3(o.duration)}" data-width="${W}" data-height="${H}" data-fps="${FPS}" data-layout-allow-overlap>
 ${audio}
 ${parts.html.join("\n")}
 </div>
@@ -565,7 +734,7 @@ ${o.extraBody ?? ""}
 
 /** Standalone HyperFrames project HTML for one scene (times start at 0, no audio). */
 export function sceneDocument(scene: Scene, ctx: ComposeContext, vendorBase = "assets", font: FontName = "oswald"): string {
-  return documentHtml(sceneParts(scene, ctx, 0), { vendorBase, font, duration: sceneDuration(scene) });
+  return documentHtml(sceneParts(scene, ctx, 0), { vendorBase, font, duration: sceneDuration(scene), mono: scene.look?.mono });
 }
 
 /** The whole video as one document, for the live preview in the browser. */
@@ -581,7 +750,7 @@ export function previewDocument(
     all.html.push(...p.html);
     all.js.push(...p.js);
   }
-  return documentHtml(all, { ...o, duration: total });
+  return documentHtml(all, { ...o, duration: total, mono: doc.look?.mono });
 }
 
 /** Asset ids a scene needs on disk to render. */

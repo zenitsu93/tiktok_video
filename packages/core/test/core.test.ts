@@ -178,3 +178,48 @@ describe("pronunciation", () => {
     expect(voiceStale({ ...beat, voiceText: "de Chadé" }, lexicon)).toBe(false);
   });
 });
+
+describe("gestures", () => {
+  const base = () => withImages(demoDoc());
+  const firstCard = (doc: VideoDoc) => doc.beats.findIndex((b) => b.layout === "card");
+
+  it("leaves a video without gestures exactly as before", () => {
+    const doc = base();
+    const html = previewDocument(doc, ctx(doc), { vendorBase: "v" });
+    expect(html).not.toContain('class="mono"');
+    expect(html).not.toContain("card shard");
+  });
+
+  it("plays a full screen as its own scene, with white text", () => {
+    const doc = base();
+    const i = firstCard(doc);
+    doc.beats[i] = { ...doc.beats[i]!, move: "fullscreen" };
+    const { scenes } = buildScenes(doc);
+    const s = scenes.find((x) => x.beats[0]!.id === doc.beats[i]!.id)!;
+    expect(s.beats).toHaveLength(1);
+    const html = sceneDocument(s, ctx(doc));
+    expect(html).toContain('class="full"');
+    expect(html).toContain('color:"#ffffff"');
+  });
+
+  it("breaks a card into four pieces on its last line", () => {
+    const doc = base();
+    const i = firstCard(doc);
+    doc.beats[i] = { ...doc.beats[i]!, move: "shatter" };
+    const s = buildScenes(doc).scenes.find((x) => x.beats.at(-1)!.id === doc.beats[i]!.id);
+    if (!s) return;
+    const html = sceneDocument(s, ctx(doc));
+    expect(html.match(/class="card shard/g)).toHaveLength(4);
+  });
+
+  it("puts every picture in black and white for a dark story", () => {
+    const doc = { ...base(), look: { seed: 7, mono: true } };
+    expect(previewDocument(doc, ctx(doc), { vendorBase: "v" })).toContain('<div id="root" class="mono"');
+  });
+
+  it("stresses a hero of several words small + big on one row", () => {
+    const { rows } = textRuns({ ...demoDoc().beats[5]!, text: "et pourtant chaque soir", hero: "chaque soir", place: "size", italic: false }, false);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.map((r) => r.cls)).toEqual(["small", "big"]);
+  });
+});

@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { ENTRANCES, imageQuerySchema, type Beat } from "@regie/core";
+import { ENTRANCES, imageQuerySchema, MOVES, type Beat } from "@regie/core";
 import { getDb, recordUsage } from "@regie/db";
 import { assertBudget, claudeCost, env } from "@regie/server";
 import { z } from "zod";
@@ -93,10 +93,12 @@ const splitSchema = z.object({
         layout: z.enum(["card", "cutout", "text", "kinetic", "vinyl", "mascot"]),
         imageQuery: imageQuerySchema,
         italic: z.boolean(),
+        move: z.enum(MOVES),
       }),
     )
     .min(4)
     .max(80),
+  mood: z.enum(["lumineux", "sombre"]),
 });
 
 export async function splitScript(videoId: string, script: string) {
@@ -114,7 +116,7 @@ export async function splitScript(videoId: string, script: string) {
   await logUsage(videoId, "découpage", msg.usage);
   checkStop(msg.stop_reason, "le découpage");
   if (!msg.parsed_output) throw new Error("Le découpage reçu n'est pas lisible.");
-  return msg.parsed_output.beats;
+  return msg.parsed_output;
 }
 
 const editSchema = z.object({

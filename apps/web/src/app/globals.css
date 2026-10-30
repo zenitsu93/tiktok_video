@@ -311,6 +311,11 @@ body.resizing iframe { pointer-events: none; }
 .tiktok-send:disabled:not(.sending):not(.processing):not(.done) { opacity: .45; }
 .tiktok-send .disc .lab { background: var(--paper); }
 @keyframes tt-fill { to { width: 70%; } }
+/* the three steps of « Envoyer sur TikTok »: Fichier, Envoi, Boîte TikTok */
+.publish-steps { display: inline-flex; gap: 4px; font-size: 13px; }
+.publish-steps i { font-style: normal; display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 6px; background: var(--panel2); color: var(--mute); }
+.publish-steps i.on { background: var(--ink); color: var(--paper); }
+.publish-steps i.done { color: var(--ok); }
 @keyframes tt-fill2 { to { width: 95%; } }
 
 /* public legal pages (asked for by the TikTok developer portal) */

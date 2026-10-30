@@ -8,7 +8,7 @@ import { z } from "zod";
  */
 
 /** Image entrances from the montage skill, in the order the skill rotates them. */
-export const ENTRANCES = ["pop", "right", "rise", "zoomin", "left", "drop", "grow", "glide"] as const;
+export const ENTRANCES = ["pop", "right", "rise", "zoomin", "left", "drop", "grow", "glide", "arc", "corner"] as const;
 export type Entrance = (typeof ENTRANCES)[number];
 
 export const ENTRANCE_LABELS: Record<Entrance, string> = {
@@ -20,7 +20,47 @@ export const ENTRANCE_LABELS: Record<Entrance, string> = {
   drop: "Descente",
   grow: "Grossir-reposer",
   glide: "Glissé",
+  arc: "Arc incliné",
+  corner: "Coin haut droit",
 };
+
+/**
+ * A gesture that tells the sentence, picked from its meaning when the script is split
+ * (montage skill, « Variations »). Rare: one every four or five lines at most.
+ * - fall: the picture lifts a little then falls out of frame on the hero word (« tombe »)
+ * - shatter: the card breaks into four pieces on the hero word (« se briser », « exploser »)
+ * - mystery: the picture blurs under the text (a secret, something hidden or forgotten)
+ * - fullscreen: the picture fills the screen, the title typed over it (the key moment, once per video)
+ * - evaporate: the card fades into the white at the end of the idea (end of a chapter)
+ * - ghost: a cut-out is born from a blur (a memory, a ghost, something unreal)
+ */
+export const MOVES = ["none", "fall", "shatter", "mystery", "fullscreen", "evaporate", "ghost"] as const;
+export type Move = (typeof MOVES)[number];
+
+export const MOVE_LABELS: Record<Move, string> = {
+  none: "Aucun",
+  fall: "Tombe",
+  shatter: "Se brise",
+  mystery: "Flou du mystère",
+  fullscreen: "Plein écran",
+  evaporate: "S'évapore",
+  ghost: "Apparition floue",
+};
+
+/**
+ * Where the text sits and how it stresses its key word (montage skill, « Placement libre » and text variations).
+ * - hero: the hero word huge in Black (default)
+ * - size: small + big in the same Regular weight (« et pourtant chaque soir »)
+ * - inline: one Regular line, the key word in Black at the same size (long lines)
+ * - side: next to a portrait card instead of under it
+ * - topright / bottomleft / topleft / bottomright: a text-only screen leaves the centre for a corner
+ */
+export const PLACES = ["hero", "size", "inline", "side", "topright", "bottomleft", "topleft", "bottomright"] as const;
+export type Place = (typeof PLACES)[number];
+
+/** Where the text sits around a card: under or above it, aligned on its left or right edge. */
+export const ZONES = ["under", "underright", "above", "aboveright"] as const;
+export type Zone = (typeof ZONES)[number];
 
 /**
  * How a beat is laid out:
@@ -93,6 +133,12 @@ export const beatSchema = z.object({
   gap: z.number().min(0).max(3),
   /** Italic accent: a work title or a word of confession (hero in Black Italic, else the line in Light Italic). */
   italic: z.boolean().optional(),
+  /** Gesture that tells the sentence (absent on videos made before the gestures: none). */
+  move: z.enum(MOVES).optional(),
+  /** Text placement and stress (absent: hero). */
+  place: z.enum(PLACES).optional(),
+  /** Text around the card (absent: under). */
+  zone: z.enum(ZONES).optional(),
 });
 export type Beat = z.infer<typeof beatSchema>;
 
@@ -116,6 +162,20 @@ export const videoDocSchema = z.object({
   voiceOk: z.boolean().optional(),
   /** « Je cherche moi-même » : no paid image search, Thomas brings each idea's picture from Pinterest (La Planche). */
   manualImages: z.boolean().optional(),
+  /**
+   * The video's own look, drawn once when the script is split so no two videos open the same way:
+   * mono puts every picture in black and white (a dark song); the cover, record and sleeve keep their colours.
+   */
+  look: z
+    .object({
+      seed: z.number().int().min(0).max(1_000_000),
+      mono: z.boolean(),
+      /** The soft zoom of the video: alternating in and out, always in, always out, or a stronger push in. */
+      zoom: z.enum(["alt", "in", "out", "push"]).optional(),
+      /** How ideas end: collapse to a point every other scene, every scene, or hard cuts to white. */
+      exit: z.enum(["mix", "point", "cut"]).optional(),
+    })
+    .optional(),
   /** The TikTok caption with its hashtags. The send to TikTok carries no text: Thomas pastes it there. */
   caption: z.string().max(2200).optional(),
 });
@@ -133,6 +193,9 @@ export const beatPatchSchema = z
     reveal: z.enum(["type", "fade"]),
     gap: z.number().min(0).max(3),
     italic: z.boolean(),
+    move: z.enum(MOVES),
+    place: z.enum(PLACES),
+    zone: z.enum(ZONES),
   })
   .partial()
   .strict();

@@ -1,7 +1,7 @@
 "use client";
 
-import { ENTRANCE_LABELS, ENTRANCES, LAYOUT_LABELS, LAYOUTS, type BeatPatch } from "@regie/core";
-import { ArrowLeft, Download, Hand, Image as ImageIcon, ImagePlus, LayoutGrid, List, Loader2, Maximize2, Mic, Minimize2, Pause, Play, RotateCcw, Scissors, Send, Sparkles, Undo2, Wand2 } from "lucide-react";
+import { ENTRANCE_LABELS, ENTRANCES, LAYOUT_LABELS, LAYOUTS, MOVE_LABELS, MOVES, type BeatPatch } from "@regie/core";
+import { ArrowLeft, Hand, Image as ImageIcon, ImagePlus, LayoutGrid, List, Loader2, Maximize2, Mic, Minimize2, Pause, Play, RotateCcw, Scissors, Send, Undo2, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BeatView, VideoView } from "@/lib/view";
@@ -10,7 +10,7 @@ import { DeleteVideo } from "./delete-video";
 import { Lecture } from "./lecture";
 import { Planche } from "./planche";
 import { PronounceWords, type Notify } from "./pronunciations";
-import { TikTokSend, tiktokMoving } from "./tiktok-send";
+import { Publish, tiktokMoving } from "./tiktok-send";
 import { StatusChip } from "./status";
 import { chime, Fan, Grooves, LineBusy, Platine, Sleeve, stageOf } from "./waits";
 
@@ -409,40 +409,16 @@ export function Fil({ initial }: { initial: VideoView }) {
             <button className="btn sm" onClick={() => run(() => call(`${url}/undo`, "POST"), "Retour en arrière")} disabled={v.version <= 1}>
               <Undo2 size={15} /> Annuler
             </button>
-            {upToDate && v.download ? (
-              <>
-                <a className="btn primary sm" href={v.download} download>
-                  <Download size={15} /> Télécharger MP4
-                </a>
-                {/* nothing changed, but the export can improve (voice level…): the shots come from the cache, only the mix is
-                    redone, and the new export goes to TikTok by itself (autoSend) */}
-                <button
-                  className="btn ghost sm"
-                  disabled={!canRender}
-                  onClick={() => run(() => call(`${url}/render`, "POST"), v.tiktok.connected ? "Export relancé : il repartira sur TikTok tout seul" : "Export relancé avec les derniers réglages")}
-                  title={v.tiktok.connected ? "Refaire l'export avec les derniers réglages (niveau de la voix…) et le renvoyer sur TikTok" : "Refaire l'export avec les derniers réglages (niveau de la voix…)"}
-                  aria-label={v.tiktok.connected ? "Refaire et renvoyer sur TikTok" : "Refaire l'export"}
-                >
-                  <RotateCcw size={15} />
-                </button>
-              </>
-            ) : (
-              <button
-                className="btn primary sm"
-                disabled={!canRender}
-                onClick={() => run(() => call(`${url}/render`, "POST"), v.download ? "Seuls les plans modifiés repassent au rendu" : "Montage lancé")}
-              >
-                {v.status === "rendering" ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
-                {v.status === "rendering" ? "Montage…" : v.download ? "Mettre à jour le MP4" : "Monter la vidéo"}
-              </button>
-            )}
-            {v.download && !upToDate && (
-              <a className="btn ghost sm" href={v.download} download title="Dernier export">
-                <Download size={15} />
-              </a>
-            )}
-            <TikTokSend
+            <Publish
               v={v}
+              canRender={canRender}
+              upToDate={upToDate}
+              render={(again) =>
+                run(
+                  () => call(`${url}/render`, "POST"),
+                  again ? "Fichier refait : il repart sur TikTok tout seul" : v.tiktok.connected ? "Préparation du fichier, puis envoi sur TikTok" : v.download ? "Seuls les plans modifiés repassent au rendu" : "Préparation du MP4",
+                )
+              }
               flash={flash}
               onQueued={() => {
                 setEager(Date.now() + 15_000);
@@ -468,7 +444,7 @@ export function Fil({ initial }: { initial: VideoView }) {
                     <span>/{v.progress.total > 1 ? v.progress.total : "…"}</span>
                   </b>
                   <div className="mute" style={{ fontSize: 14 }}>
-                    plans prêts · seuls les plans modifiés repassent au rendu
+                    plans du fichier prêts · seuls les plans modifiés repassent au rendu
                   </div>
                 </div>
               </div>
@@ -511,14 +487,14 @@ export function Fil({ initial }: { initial: VideoView }) {
           {v.status === "ready" && !v.download && v.manualImages && (
             <div className="panel step" role="status">
               <b>Étape 3 : trouve tes images</b>
-              <span className="mute">Une case par idée. Quand chaque case a son image, « Monter la vidéo » : à la fin du montage, elle part sur TikTok.</span>
+              <span className="mute">Une case par idée. L&apos;aperçu est la vidéo finale : quand chaque case a son image, « Envoyer sur TikTok ».</span>
             </div>
           )}
           {v.status === "ready" && !v.download && !v.manualImages && (
             <div className="panel step" role="status">
               <b>Étape 3 : vérifie les images</b>
               <span className="mute">
-                Regarde l&apos;aperçu et change ce qui ne va pas (clique sur une phrase). Puis « Monter la vidéo » : à la fin du montage, elle part sur TikTok.
+                L&apos;aperçu est la vidéo finale. Change ce qui ne va pas (clique sur une phrase), puis « Envoyer sur TikTok ».
               </span>
             </div>
           )}
@@ -950,6 +926,17 @@ function Inspector({
           {ENTRANCES.map((en) => (
             <button key={en} className="pick" aria-pressed={b.entrance === en} onClick={() => patch({ entrance: en })}>
               {ENTRANCE_LABELS[en]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grp">
+        <span className="lab" title="Choisi tout seul d'après la phrase ; à changer seulement si le choix ne te plaît pas">Geste</span>
+        <div className="chips">
+          {MOVES.map((m) => (
+            <button key={m} className="pick" aria-pressed={b.move === m} onClick={() => patch({ move: m })}>
+              {MOVE_LABELS[m]}
             </button>
           ))}
         </div>
