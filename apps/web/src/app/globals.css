@@ -369,3 +369,5 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--line)
 .tile-cands button { flex: 1; aspect-ratio: 4 / 5; padding: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; cursor: pointer; background: var(--panel2); min-width: 0; }
 .tile-cands img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tile-auto { align-self: flex-start; font-size: 12.5px; color: var(--mute); }
+.cands .clipmark { position: absolute; bottom: 4px; left: 4px; width: 18px; height: 18px; border-radius: 50%; background: var(--paper); color: var(--ink); display: grid; place-items: center; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.tile-slot video { width: 100%; height: 100%; object-fit: cover; display: block; }

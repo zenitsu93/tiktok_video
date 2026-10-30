@@ -57,6 +57,15 @@ describe("scenes", () => {
     expect(scenes[0]!.kind).toBe("vinyl");
   });
 
+  it("plays a clip muted in a card, without the zoom of a still", () => {
+    const card = scenes.find((s) => s.kind === "card" && s.image)!;
+    const id = card.image!;
+    const clipDoc = { ...doc, assets: { ...doc.assets, [id]: { ...doc.assets[id]!, kind: "video" as const, mime: "video/mp4" } } };
+    const html = sceneDocument(card, ctx(clipDoc));
+    expect(html).toMatch(/<div class="card"><video src="[^"]+" muted playsinline/);
+    expect(html).not.toContain(`#s${card.index} img`);
+  });
+
   it("only changes the scene of the edited beat", () => {
     const before = buildScenes(doc).scenes.map((s) => sceneDocument(s, ctx(doc)));
     const { doc: edited } = applyBeatPatch(doc, "b07", { hero: "née", entrance: "drop" });

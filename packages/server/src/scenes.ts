@@ -5,7 +5,7 @@ import { brandFonts } from "./fonts";
 /** Bump when the renderer itself changes, so cached clips are not reused. */
 export const RENDERER_VERSION = "hf-0.8.214/1";
 
-const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/svg+xml": "svg" };
+const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/svg+xml": "svg", "video/mp4": "mp4" };
 export const assetFile = (a: Pick<Asset, "id" | "mime">) => `${a.id}.${EXT[a.mime] ?? "bin"}`;
 
 export function renderContext(doc: VideoDoc): ComposeContext {
