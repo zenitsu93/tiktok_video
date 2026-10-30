@@ -1,7 +1,7 @@
 import type { VideoDoc } from "@regie/core";
 import { and, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import type { Db } from "./index";
-import { assets, library, sceneRenders, usage, videos, videoVersions, type Progress, type VideoStatus } from "./schema";
+import { assets, sceneRenders, usage, videos, videoVersions, type Progress, type VideoStatus } from "./schema";
 
 export type VideoRow = typeof videos.$inferSelect;
 
@@ -104,7 +104,6 @@ export async function staleVideos(db: Db, days: number): Promise<string[]> {
 /**
  * Deletes a video for good: its row and saved versions, then the files nothing points
  * to any more (its images, voice clips and exports, the scene clips of its last export).
- * The pictures it put in the library stay, for the next videos.
  * Returns their storage keys for the caller to remove. Usage rows stay, so the spend
  * history and the daily budget still count what this video cost.
  */
@@ -118,12 +117,11 @@ export async function deleteVideo(db: Db, id: string): Promise<string[]> {
     const ownIds = [...own.map((r) => r.id), ...(row.render ? [row.render] : [])];
     await tx.delete(videos).where(eq(videos.id, id));
 
-    // anything a video, one of its versions, its last export or the library still uses stays
+    // anything a video, one of its versions or its last export still uses stays
     const used = sql`(
       select jsonb_object_keys(doc->'assets') from ${videos}
       union select jsonb_object_keys(doc->'assets') from ${videoVersions}
-      union select render_asset from ${videos} where render_asset is not null
-      union select jsonb_array_elements(files)->>'id' from ${library})`;
+      union select render_asset from ${videos} where render_asset is not null)`;
     // other orphans (older exports, leftovers) wait an hour, so a file being stored right now is never taken
     const old = lt(assets.createdAt, sql`now() - interval '1 hour'`);
     const files = await tx

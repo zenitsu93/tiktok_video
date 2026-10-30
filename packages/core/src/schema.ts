@@ -60,8 +60,6 @@ export const assetSchema = z.object({
   checker: z.boolean().optional(),
   /** A clip (GIF or short video Thomas brought): its first frame, an image asset, for thumbnails and the accent. */
   poster: z.string().max(80).optional(),
-  /** It came from Thomas's library (kept on an earlier video): no search was paid for it. */
-  library: z.boolean().optional(),
 });
 export type Asset = z.infer<typeof assetSchema>;
 

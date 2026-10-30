@@ -1,7 +1,6 @@
 import { closeDb, getDb, setError, setProgress, setStatus } from "@regie/db";
 import { BudgetError, env, jobData, JOBS, providers, queue, retryLimit, type JobName } from "@regie/server";
 import { cleanup } from "./cleanup";
-import { fillLibrary } from "./library";
 import { caption, cleanImage, generate, ownImage, moreImages, prerender, render, reviseScript, revoice, rewrite } from "./pipeline";
 import { sendToTikTok } from "./tiktok";
 
@@ -68,9 +67,6 @@ await boss.work(JOBS.prerender, { localConcurrency: 1 }, async ([job]) => {
 // every night at 4:00 (UTC); a missed night is caught up by the next one
 await boss.schedule(JOBS.cleanup, "0 4 * * *");
 await boss.work(JOBS.cleanup, () => cleanup());
-
-// the videos exported before the library existed give it their pictures, once
-await fillLibrary().catch((e) => console.warn("[bibliothèque]", (e as Error).message));
 
 console.log("[worker] prêt");
 

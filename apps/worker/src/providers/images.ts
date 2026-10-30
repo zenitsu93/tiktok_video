@@ -1,4 +1,4 @@
-import { getDb, recordUsage } from "@regie/db";
+import { getDb, getPinSearch, recordUsage, savePinSearch } from "@regie/db";
 import { assertBudget, BudgetError, env, PRICES } from "@regie/server";
 
 /**
@@ -65,8 +65,17 @@ export function pinUrls(item: unknown): string[] {
   return [...new Set(found)].sort((a, b) => rank(b) - rank(a));
 }
 
-/** Pinterest search through the Apify actor; returns the best image URL of each pin. */
-export async function searchPinterest(videoId: string, query: string, limit: number): Promise<string[]> {
+/**
+ * Pinterest search through the Apify actor; returns the best image URL of each pin.
+ * The exact same words already searched (on any video) give their pins again, free, unless
+ * this video has them all already (`skip`): then the search is paid for again.
+ */
+export async function searchPinterest(videoId: string, query: string, limit: number, skip: Set<string | undefined> = new Set()): Promise<string[]> {
+  const saved = await getPinSearch(getDb(), query);
+  if (saved?.some((u) => !skip.has(u))) {
+    console.log(`[images] « ${query} » déjà cherché : ${saved.length} pins repris, pas d'appel Apify`);
+    return saved;
+  }
   await assertBudget(videoId);
   const e = env();
   const res = await fetch(
@@ -95,7 +104,9 @@ export async function searchPinterest(videoId: string, query: string, limit: num
     units: { results: items.length },
     costUsd: (items.length * PRICES.apifyPerResult).toFixed(5),
   });
-  return items.map((it) => pinUrls(it)[0]).filter((u): u is string => Boolean(u));
+  const urls = items.map((it) => pinUrls(it)[0]).filter((u): u is string => Boolean(u));
+  await savePinSearch(getDb(), query, urls);
+  return urls;
 }
 
 /** Cover of the single or album from Deezer's public API (no key), 1000 px: exact track first, then a looser search. */

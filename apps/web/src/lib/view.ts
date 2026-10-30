@@ -36,8 +36,7 @@ export interface VideoView {
   beats: BeatView[];
   /** clean: the same image without its background; checker: it came on a fake checkerboard. */
   /** clip: a GIF or short video (silent MP4); `url` is then its first frame, for thumbnails. */
-  /** mine: it came from the library (kept on an earlier video). */
-  images: Record<string, { url: string; accent: string | null; w?: number; h?: number; clean?: string; checker?: boolean; clip?: string; mine?: boolean }>;
+  images: Record<string, { url: string; accent: string | null; w?: number; h?: number; clean?: string; checker?: boolean; clip?: string }>;
   cover: string | null;
   sources: string[];
   /** « Je cherche moi-même » was chosen at the voice: the images come from La Planche. */
@@ -86,8 +85,8 @@ export async function videoView(row: VideoRow): Promise<VideoView> {
   if (doc.cover) want.add(doc.cover);
   for (const id of want) {
     const a = doc.assets[id];
-    if (a?.kind === "image") images[id] = { url: signMedia(id, 6 * 3600), accent: a.accent ?? null, w: a.width, h: a.height, clean: a.clean, checker: a.checker, mine: a.library };
-    else if (a?.kind === "video" && a.poster) images[id] = { url: signMedia(a.poster, 6 * 3600), accent: a.accent ?? null, w: a.width, h: a.height, clip: signMedia(id, 6 * 3600), mine: a.library };
+    if (a?.kind === "image") images[id] = { url: signMedia(id, 6 * 3600), accent: a.accent ?? null, w: a.width, h: a.height, clean: a.clean, checker: a.checker };
+    else if (a?.kind === "video" && a.poster) images[id] = { url: signMedia(a.poster, 6 * 3600), accent: a.accent ?? null, w: a.width, h: a.height, clip: signMedia(id, 6 * 3600) };
   }
   const send = await lastTikTokSend(getDb(), row.id);
   const pronunciations = await listPronunciations(getDb());
