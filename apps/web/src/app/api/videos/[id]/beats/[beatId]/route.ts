@@ -21,5 +21,7 @@ export const PATCH = route(async (req, { params }: Ctx) => {
     return r.doc;
   });
   if (voiceChanged) await enqueue(JOBS.voice, { videoId: id, beatId: beat });
+  // the changed scene is made ahead, so the next export has less to do
+  else await enqueue(JOBS.prerender, { videoId: id });
   return NextResponse.json(await videoView(row));
 });

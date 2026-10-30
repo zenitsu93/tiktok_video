@@ -20,6 +20,8 @@ export const JOBS = {
   tiktok: "tiktok-send",
   /** Write the TikTok caption again, from the script as it reads now. */
   caption: "video-caption",
+  /** Scenes rendered ahead into the cache while the shots are checked: only this server's time. */
+  prerender: "video-prerender",
   /** Every night: delete the videos untouched for RETENTION_DAYS days. */
   cleanup: "videos-cleanup",
 } as const;
@@ -34,6 +36,7 @@ export const jobData = {
   [JOBS.tiktok]: z.object({ videoId: z.string().uuid(), sendId: z.string().uuid() }),
   [JOBS.caption]: z.object({ videoId: z.string().uuid() }),
   [JOBS.cleanup]: z.object({}),
+  [JOBS.prerender]: z.object({ videoId: z.string().uuid() }),
 };
 
 export type JobName = (typeof JOBS)[keyof typeof JOBS];
@@ -47,8 +50,8 @@ export function queue(): Promise<PgBoss> {
     b.on("error", (e) => console.error("[queue]", e));
     await b.start();
     for (const name of Object.values(JOBS)) {
-      // one export per video at a time; a newer request waits for the current one
-      await b.createQueue(name, name === JOBS.render ? { policy: "stately" } : {});
+      // one export per video at a time; a newer request waits for the current one (same for the head start)
+      await b.createQueue(name, name === JOBS.render || name === JOBS.prerender ? { policy: "stately" } : {});
     }
     return b;
   })();
@@ -57,7 +60,8 @@ export function queue(): Promise<PgBoss> {
 
 /** How many times a failed job is tried again before the video shows an error. */
 // a TikTok send is never retried on its own: a second try could land a second copy in the inbox
-export const retryLimit = (name: JobName) => (name === JOBS.tiktok ? 0 : name === JOBS.generate || name === JOBS.render ? 4 : 3);
+// a head start that fails is not worth another go: the export does the scene anyway
+export const retryLimit = (name: JobName) => (name === JOBS.tiktok || name === JOBS.prerender ? 0 : name === JOBS.generate || name === JOBS.render ? 4 : 3);
 
 export async function enqueue<N extends JobName>(name: N, data: JobData<N>): Promise<string | null> {
   const parsed = jobData[name].parse(data);
@@ -68,6 +72,6 @@ export async function enqueue<N extends JobName>(name: N, data: JobData<N>): Pro
     retryLimit: retryLimit(name),
     retryDelay: 10,
     retryBackoff: true,
-    singletonKey: name === JOBS.render ? (parsed as JobData<typeof JOBS.render>).videoId : undefined,
+    singletonKey: name === JOBS.render || name === JOBS.prerender ? (parsed as JobData<typeof JOBS.render>).videoId : undefined,
   });
 }

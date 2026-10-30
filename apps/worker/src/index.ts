@@ -1,7 +1,7 @@
 import { closeDb, getDb, setError, setProgress, setStatus } from "@regie/db";
 import { BudgetError, env, jobData, JOBS, providers, queue, retryLimit, type JobName } from "@regie/server";
 import { cleanup } from "./cleanup";
-import { caption, generate, moreImages, render, reviseScript, revoice, rewrite } from "./pipeline";
+import { caption, generate, moreImages, prerender, render, reviseScript, revoice, rewrite } from "./pipeline";
 import { sendToTikTok } from "./tiktok";
 
 /**
@@ -54,6 +54,12 @@ await handle(JOBS.caption, 1, (d: { videoId: string }) => caption(d.videoId));
 await boss.work(JOBS.tiktok, { localConcurrency: 1 }, async ([job]) => {
   const d = jobData[JOBS.tiktok].parse(job!.data);
   await sendToTikTok(d.videoId, d.sendId);
+});
+
+// the head start never touches the video's status or error: it only saves time on the next export
+await boss.work(JOBS.prerender, { localConcurrency: 1 }, async ([job]) => {
+  const d = jobData[JOBS.prerender].parse(job!.data);
+  await prerender(d.videoId).catch((e) => console.warn(`[prerender] ${d.videoId}:`, (e as Error).message));
 });
 
 // every night at 4:00 (UTC); a missed night is caught up by the next one
