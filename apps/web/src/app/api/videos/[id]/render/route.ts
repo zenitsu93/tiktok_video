@@ -12,6 +12,7 @@ export const POST = route(async (_req, { params }: Ctx) => {
   const row = await getVideo(db, id);
   if (!row) throw new HttpError(404, "Vidéo introuvable.");
   if (row.status === "generating") throw new HttpError(409, "La vidéo est encore en préparation.");
+  if (row.status === "listen") throw new HttpError(409, "Valide d'abord la voix : les images ne sont pas encore cherchées.");
   if (!row.doc.beats.length) throw new HttpError(409, "Il n'y a encore aucun plan.");
   await setStatus(db, id, "rendering", { step: "En file", done: 0, total: 1 });
   await enqueue(JOBS.render, { videoId: id });

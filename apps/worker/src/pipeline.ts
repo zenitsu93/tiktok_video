@@ -182,6 +182,7 @@ async function coverFor(videoId: string) {
  * The whole pipeline. Every step is saved as soon as it is done and skipped when
  * it already is, so a retry after a lost connection picks up where it stopped:
  * the script is not paid for twice, voiced lines and found images are kept.
+ * It stops three times for Thomas: the script to read, the voice to hear, the shots to check.
  */
 export async function generate(videoId: string) {
   const row = await load(videoId);
@@ -235,6 +236,12 @@ export async function generate(videoId: string) {
   );
   await remixVoice(videoId);
 
+  // Thomas listens before anything else is spent: the images wait for « Valider la voix »
+  if (!(await load(videoId)).doc.voiceOk) {
+    await setStatus(db(), videoId, "listen", { step: "Voix à écouter", done: 0, total: 1 });
+    return;
+  }
+
   // images: one search per idea, shared by the beats that say it
   const groups: string[][] = [];
   beats.forEach((b, i) => {
@@ -278,8 +285,8 @@ export async function generate(videoId: string) {
   if (!(await load(videoId)).doc.cover) await coverFor(videoId);
   // a caption that fails does not hold the video back: the « Écrire la légende » button retries it
   if (!(await load(videoId)).doc.caption) await caption(videoId).catch((e) => console.warn("[légende]", (e as Error).message));
+  // the montage waits for Thomas too: he checks the shots, then « Monter la vidéo » (which then goes to TikTok)
   await setStatus(db(), videoId, "ready");
-  await enqueue(JOBS.render, { videoId });
 }
 
 /** The TikTok caption, from the beats as they read now (so a « Réécrire » follows the edits). */

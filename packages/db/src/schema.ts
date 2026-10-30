@@ -2,7 +2,8 @@ import type { VideoDoc } from "@regie/core";
 import { sql } from "drizzle-orm";
 import { bigint, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
-export type VideoStatus = "draft" | "review" | "generating" | "ready" | "rendering" | "error";
+/** review: the script waits to be read; listen: the voice waits to be heard; ready: shots to check, then the montage. */
+export type VideoStatus = "draft" | "review" | "generating" | "listen" | "ready" | "rendering" | "error";
 
 export interface Progress {
   step: string;

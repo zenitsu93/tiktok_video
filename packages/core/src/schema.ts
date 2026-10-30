@@ -106,6 +106,8 @@ export const videoDocSchema = z.object({
   draft: z.string().max(40_000).nullable().optional(),
   /** Thomas read and approved the script: until then nothing paid (voice, images) is spent. */
   scriptOk: z.boolean().optional(),
+  /** Thomas listened to the voice and approved it: only then are images searched (they cost). */
+  voiceOk: z.boolean().optional(),
   /** The TikTok caption with its hashtags. The send to TikTok carries no text: Thomas pastes it there. */
   caption: z.string().max(2200).optional(),
 });

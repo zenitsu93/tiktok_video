@@ -14,9 +14,9 @@ Ensuite je relis. Le script s'affiche phrase par phrase, et chaque phrase est un
 
 1. Claude écrit l'histoire, avec recherche web et sources. Je la relis sur une page de lecture : je corrige à la main ou je demande une réécriture, puis je valide. Rien de payant (voix, images) ne part avant.
 2. Claude découpe le script validé en plans, avec le rythme du skill de montage : à peu près un plan sans image sur quatre, une image tenue sur un à trois plans, quelques mots en italique pour varier.
-3. ElevenLabs lit tout le script d'une traite avec ma voix (voice id `AYfOkr1hDQYbhigmRZ16`). La prise est ensuite coupée dans les pauses, un morceau par plan, donc l'intonation ne repart pas à zéro tous les trois mots.
-4. Apify va chercher des images sur Pinterest, Deezer donne la pochette.
-5. HyperFrames monte chaque plan en 1080×1920, en Kaneda Gothic, fond blanc. La vidéo s'ouvre et se ferme sur la « Pochette » : le vinyle sort de la pochette de la chanson, avec le titre et l'artiste. ffmpeg colle les plans et pose la voix.
+3. ElevenLabs lit tout le script d'une traite avec ma voix (voice id `AYfOkr1hDQYbhigmRZ16`). La prise est ensuite coupée dans les pauses, un morceau par plan, donc l'intonation ne repart pas à zéro tous les trois mots. Là, tout s'arrête : j'écoute, je corrige un mot mal dit ou une phrase, puis « Valider la voix ». Les images, qui se paient, ne sont cherchées qu'après.
+4. Apify va chercher des images sur Pinterest, Deezer donne la pochette. Rien ne se monte tout seul : je regarde l'aperçu, je change les images qui ne vont pas, puis « Monter la vidéo ».
+5. HyperFrames monte chaque plan en 1080×1920, en Kaneda Gothic, fond blanc. La vidéo s'ouvre et se ferme sur la « Pochette » : le vinyle sort de la pochette de la chanson, avec le titre et l'artiste. ffmpeg colle les plans et pose la voix. À la fin du montage, la vidéo part dans ma boîte de réception TikTok.
 
 Si la connexion lâche pendant une génération, la tâche réessaie toute seule. Si elle finit quand même en erreur, le bouton « Reprendre » repart de là où elle s'était arrêtée. Une vidéo à qui il manque des images (Apify qui refuse, plafond atteint) s'arrête avant le montage, avec la raison : elle ne part jamais comme un mur de texte. « Reprendre » ne va chercher que les images manquantes.
 

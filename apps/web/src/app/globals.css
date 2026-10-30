@@ -104,6 +104,7 @@ body.resizing iframe { pointer-events: none; }
 .transport input[type="range"] { flex: 1; }
 .panel { border: 1px solid var(--line); border-radius: 12px; background: var(--paper); padding: 12px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
 .panel .r { display: flex; justify-content: space-between; gap: 10px; }
+.panel.step { border-color: var(--accent); gap: 8px; }
 
 .beats { display: flex; flex-direction: column; gap: 2px; }
 .beat { border-radius: 12px; position: relative; }
