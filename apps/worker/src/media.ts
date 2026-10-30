@@ -65,6 +65,27 @@ export async function ingestImage(input: Buffer, source: string): Promise<Asset>
   return { id, kind: "image", mime, width: out.info.width, height: out.info.height, accent: await accentOf(out.data), source };
 }
 
+/** Loudness the voice leaves the Régie at: TikTok plays around -14 LUFS, so the voice holds its own over added music. */
+export const VOICE_LUFS = -14;
+const VOICE_PEAK = -1;
+// cuts the rumble under the voice and evens out the soft words before the level is set
+const VOICE_SHAPE = "highpass=f=80,acompressor=threshold=-20dB:ratio=3:attack=5:release=120:makeup=2";
+
+/**
+ * The filter that brings a voice track to VOICE_LUFS, measured on the file first (two passes),
+ * so the gain is one constant: the voice gets louder without pumping.
+ */
+export async function voiceLevelFilter(path: string): Promise<string> {
+  const target = `I=${VOICE_LUFS}:TP=${VOICE_PEAK}:LRA=11`;
+  const { stderr } = await ff("ffmpeg", ["-hide_banner", "-nostats", "-i", path, "-af", `${VOICE_SHAPE},loudnorm=${target}:print_format=json`, "-f", "null", "-"]);
+  const json = stderr.slice(stderr.lastIndexOf("{"), stderr.lastIndexOf("}") + 1);
+  const m = JSON.parse(json) as Record<string, string>;
+  const ok = ["input_i", "input_tp", "input_lra", "input_thresh", "target_offset"].every((k) => Number.isFinite(Number(m[k])));
+  // a silent track measures -inf: leave it as it is
+  if (!ok) return VOICE_SHAPE;
+  return `${VOICE_SHAPE},loudnorm=${target}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true,aresample=44100`;
+}
+
 export async function audioDuration(path: string): Promise<number> {
   const { stdout } = await ff("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", path]);
   const d = Number(stdout.trim());

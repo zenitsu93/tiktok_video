@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import pLimit from "p-limit";
-import { ff, storeFile, withTemp } from "./media";
+import { ff, storeFile, voiceLevelFilter, withTemp } from "./media";
 
 const run = promisify(execFile);
 const require = createRequire(import.meta.url);
@@ -117,7 +117,8 @@ export async function exportVideo(videoId: string, doc: VideoDoc, onProgress: (d
       if (row) {
         const voice = join(dir, "voice.m4a");
         await storage().download(row.storageKey, voice);
-        args.push("-i", voice, "-map", "0:v", "-map", "1:a", "-c:a", "aac", "-b:a", "192k");
+        // the voice leaves at TikTok's level, so it stays clear under music added in TikTok
+        args.push("-i", voice, "-map", "0:v", "-map", "1:a", "-af", await voiceLevelFilter(voice), "-c:a", "aac", "-b:a", "192k");
       }
     }
     args.push("-c:v", "copy", "-t", total.toFixed(3), "-movflags", "+faststart", final);
