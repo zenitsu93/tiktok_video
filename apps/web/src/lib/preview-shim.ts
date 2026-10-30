@@ -1,7 +1,9 @@
 /**
  * Runs inside the preview frame. HyperFrames does the clip scheduling when it
  * renders; here a few lines do the same so the page plays like the final video.
- * It only talks to the parent window, by postMessage.
+ * It only talks to the parent window, by postMessage. The voice plays in the parent
+ * (a sandboxed frame may not start sound from a click made outside it): its time
+ * comes in as regie:sync and keeps this clock on the voice.
  */
 export const PREVIEW_SHIM = `
 (function(){
@@ -43,6 +45,7 @@ export const PREVIEW_SHIM = `
     if (ev.source !== parent || !ev.data || typeof ev.data.type !== "string") return;
     var d = ev.data;
     if (d.type === "regie:seek" && typeof d.t === "number" && isFinite(d.t)) { if (audio) audio.currentTime = Math.max(0, d.t); w0 = d.t; t0 = performance.now(); show(d.t); }
+    else if (d.type === "regie:sync" && typeof d.t === "number" && isFinite(d.t)) { w0 = d.t; t0 = performance.now(); }
     else if (d.type === "regie:play") play();
     else if (d.type === "regie:pause") pause();
   });

@@ -21,7 +21,6 @@ export const GET = route(async (req, { params }: Ctx) => {
     {
       vendorBase: "/vendor",
       font: brandFonts().name,
-      audio: doc.voiceTrack ? signMedia(doc.voiceTrack, 6 * 3600) : undefined,
       extraHead: `<style>.clip{visibility:hidden}</style>`,
       extraBody: `<script>${PREVIEW_SHIM}</script>`,
     },

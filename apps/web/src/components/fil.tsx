@@ -184,6 +184,16 @@ export function Fil({ initial }: { initial: VideoView }) {
   // preview frame: it talks only through postMessage, and only messages from that frame count
   const newest = frames.at(-1)!.src;
   const post = useCallback((msg: object) => refs.current.get(newest)?.contentWindow?.postMessage(msg, "*"), [newest]);
+  // The voice plays here, in the page: a sandboxed frame may not start sound from a click
+  // made outside it (Safari, and Chrome on a site it does not know yet). The frame follows it.
+  const voice = useRef<HTMLAudioElement>(null);
+  // the signed link changes every quarter of an hour: reload only for a new voice, not mid-reading
+  const [voiceSrc, setVoiceSrc] = useState(v.voice);
+  useEffect(() => {
+    if (v.voice?.split("?")[0] === voiceSrc?.split("?")[0]) return;
+    setVoiceSrc(v.voice);
+    post({ type: "regie:pause" });
+  }, [v.voice, voiceSrc, post]);
   useEffect(() => {
     const on = (ev: MessageEvent) => {
       if (typeof ev.data?.type !== "string") return;
@@ -191,7 +201,10 @@ export function Fil({ initial }: { initial: VideoView }) {
       if (!src) return;
       if (ev.data.type === "regie:ready" && src === newest) {
         readyFrames.current.add(src);
-        refs.current.get(src)?.contentWindow?.postMessage({ type: "regie:seek", t: lastT.current }, "*");
+        const w = refs.current.get(src)?.contentWindow;
+        w?.postMessage({ type: "regie:seek", t: voice.current && !voice.current.paused ? voice.current.currentTime : lastT.current }, "*");
+        // a frame that takes over while the voice plays picks the reading up
+        if (voice.current && !voice.current.paused) w?.postMessage({ type: "regie:play" }, "*");
         setFrames((f) => f.map((x) => (x.src === src ? { ...x, ready: true } : x)));
         setTimeout(() => setFrames((f) => (f.at(-1)?.src === src ? f.slice(-1) : f)), 300);
       }
@@ -208,8 +221,39 @@ export function Fil({ initial }: { initial: VideoView }) {
 
   const seekTo = (s: number) => {
     lastT.current = s;
+    if (voice.current) voice.current.currentTime = s;
     post({ type: "regie:seek", t: s });
   };
+
+  const togglePlay = () => {
+    const a = voice.current;
+    if (playing) {
+      a?.pause();
+      post({ type: "regie:pause" });
+      return;
+    }
+    const from = lastT.current >= v.total - 0.05 ? 0 : lastT.current;
+    if (a) {
+      a.currentTime = from;
+      a.play().catch((e: Error) => flash(`La voix ne démarre pas : ${e.message}`, true));
+    }
+    post({ type: "regie:seek", t: from });
+    post({ type: "regie:play" });
+  };
+  useEffect(() => {
+    const a = voice.current;
+    if (!a) return;
+    const sync = () => {
+      if (!a.paused) post({ type: "regie:sync", t: a.currentTime });
+    };
+    const stop = () => post({ type: "regie:pause" });
+    a.addEventListener("timeupdate", sync);
+    a.addEventListener("ended", stop);
+    return () => {
+      a.removeEventListener("timeupdate", sync);
+      a.removeEventListener("ended", stop);
+    };
+  }, [post, voiceSrc]);
 
   // a second click on the open shot closes it
   const choose = (b: BeatView) => {
@@ -506,7 +550,8 @@ export function Fil({ initial }: { initial: VideoView }) {
             ))}
           </div>
           <div className="transport">
-            <button className="btn sm" onClick={() => post({ type: playing ? "regie:pause" : "regie:play" })} aria-label={playing ? "Pause" : "Lecture"}>
+            <audio ref={voice} src={voiceSrc ?? undefined} preload="auto" />
+            <button className="btn sm" onClick={togglePlay} aria-label={playing ? "Pause" : "Lecture"}>
               {playing ? <Pause size={15} /> : <Play size={15} />}
             </button>
             <input
