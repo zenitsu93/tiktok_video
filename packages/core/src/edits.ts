@@ -1,4 +1,4 @@
-import type { Beat, BeatPatch, VideoDoc } from "./schema";
+import type { Beat, BeatPatch, BeatStyle, Style, VideoDoc } from "./schema";
 
 export class EditError extends Error {}
 
@@ -68,4 +68,34 @@ export function beatContext(doc: VideoDoc, beatId: string, radius = 2): { before
     target: doc.beats[i]!,
     after: doc.beats.slice(i + 1, i + 1 + radius).map((b) => b.text),
   };
+}
+
+/** The montage of a document as it is now (look and each beat's montage choices), to come back to it later. */
+export function snapshotStyle(doc: VideoDoc): Style {
+  const pick = (b: Beat): BeatStyle => ({
+    entrance: b.entrance,
+    accent: b.accent,
+    reveal: b.reveal,
+    ...(b.move ? { move: b.move } : {}),
+    ...(b.place ? { place: b.place } : {}),
+    ...(b.zone ? { zone: b.zone } : {}),
+  });
+  return { look: doc.look ?? null, beats: Object.fromEntries(doc.beats.map((b) => [b.id, pick(b)])) };
+}
+
+/**
+ * Puts back one of the montages tried on this video (« Style 2 »): the words, voices and pictures
+ * stay as they are now, only the montage choices change. Free: no model, the scenes come from the cache.
+ */
+export function applyStyle(doc: VideoDoc, index: number): VideoDoc {
+  const style = doc.styles?.[index];
+  if (!style) throw new EditError("Ce style n'existe pas.");
+  const beats = doc.beats.map((b) => {
+    const s = style.beats[b.id];
+    if (!s) return b;
+    const { move, place, zone, ...rest } = b;
+    return { ...rest, ...s } as Beat;
+  });
+  const { look, ...rest } = doc;
+  return { ...rest, ...(style.look ? { look: style.look } : {}), beats, styleIndex: index };
 }

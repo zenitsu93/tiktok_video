@@ -142,6 +142,36 @@ export const beatSchema = z.object({
 });
 export type Beat = z.infer<typeof beatSchema>;
 
+export const lookSchema = z.object({
+  seed: z.number().int().min(0).max(1_000_000),
+  mono: z.boolean(),
+  /** The soft zoom of the video: alternating in and out, always in, always out, or a stronger push in. */
+  zoom: z.enum(["alt", "in", "out", "push"]).optional(),
+  /** How ideas end: collapse to a point every other scene, every scene, or hard cuts to white. */
+  exit: z.enum(["mix", "point", "cut"]).optional(),
+});
+export type Look = z.infer<typeof lookSchema>;
+
+export const readingSchema = z.object({
+  moves: z.record(z.string(), z.enum(MOVES)),
+  mood: z.enum(["lumineux", "sombre"]),
+});
+export type Reading = z.infer<typeof readingSchema>;
+
+/** The montage choices of one beat: what a new style changes, never the words, voice or picture. */
+export const beatStyleSchema = z.object({
+  entrance: z.enum(ENTRANCES),
+  accent: z.boolean(),
+  reveal: z.enum(["type", "fade"]),
+  move: z.enum(MOVES).optional(),
+  place: z.enum(PLACES).optional(),
+  zone: z.enum(ZONES).optional(),
+});
+export type BeatStyle = z.infer<typeof beatStyleSchema>;
+
+export const styleSchema = z.object({ look: lookSchema.nullable(), beats: z.record(z.string(), beatStyleSchema) });
+export type Style = z.infer<typeof styleSchema>;
+
 export const videoDocSchema = z.object({
   title: z.string().min(1).max(120),
   artist: z.string().min(1).max(120),
@@ -166,16 +196,13 @@ export const videoDocSchema = z.object({
    * The video's own look, drawn once when the script is split so no two videos open the same way:
    * mono puts every picture in black and white (a dark song); the cover, record and sleeve keep their colours.
    */
-  look: z
-    .object({
-      seed: z.number().int().min(0).max(1_000_000),
-      mono: z.boolean(),
-      /** The soft zoom of the video: alternating in and out, always in, always out, or a stronger push in. */
-      zoom: z.enum(["alt", "in", "out", "push"]).optional(),
-      /** How ideas end: collapse to a point every other scene, every scene, or hard cuts to white. */
-      exit: z.enum(["mix", "point", "cut"]).optional(),
-    })
-    .optional(),
+  look: lookSchema.optional(),
+  /** Claude's reading of the lines (gesture per beat id, mood), kept so a new style costs nothing more. */
+  reading: readingSchema.optional(),
+  /** Every montage tried on this video (« Remonter autrement »), the first one being the montage it had before. */
+  styles: z.array(styleSchema).max(12).optional(),
+  /** Which of `styles` is on screen. */
+  styleIndex: z.number().int().min(0).optional(),
   /** The TikTok caption with its hashtags. The send to TikTok carries no text: Thomas pastes it there. */
   caption: z.string().max(2200).optional(),
 });

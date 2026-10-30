@@ -1,4 +1,4 @@
-import { ENTRANCES, FPS, type Beat, type Entrance, type Move, type Place, type VideoDoc, type Zone } from "@regie/core";
+import { ENTRANCES, FPS, type Beat, type BeatStyle, type Entrance, type Move, type Place, type Reading, type VideoDoc, type Zone } from "@regie/core";
 
 /** One passage as the split returns it. */
 export interface Row {
@@ -210,9 +210,11 @@ export function pickPlaces(rows: Row[], seed: number, style = drawStyle(seed)): 
   return { places, zones };
 }
 
-/** Beats from the split, with the montage skill's variations already chosen. `seed` makes the video its own. */
-export function toBeats(split: Row[], seed = 0): Beat[] {
-  const rows = balanceRows(split);
+/**
+ * The montage choices of each line for one seed: entrance, accent, reveal, gesture, placement.
+ * Only the montage: the words, the hero, the layout and the picture are the lines' own.
+ */
+export function styleRows(rows: Row[], seed: number): BeatStyle[] {
   const moves = pickMoves(rows);
   // seed 0 keeps the skill's own order; any other seed turns the entrances in the video's own order
   const style = drawStyle(seed);
@@ -221,37 +223,62 @@ export function toBeats(split: Row[], seed = 0): Beat[] {
   let r = seed % order.length;
   let lines = seed % 3;
   let pictures = seed % 4;
-  let lastItalic = -9;
   return rows.map((row, i) => {
     const sameIdea = sameQuery(rows[i - 1], row);
     const visual = row.layout === "card" || row.layout === "cutout";
     if (visual && !sameIdea) r = (r + 1) % order.length;
-    // italics stay rare: never two in a row, never on the subscribe lines
-    const italic = Boolean(row.italic) && row.layout !== "mascot" && i - lastItalic > 1;
-    if (italic) lastItalic = i;
     // about one line in three turns from grey to black instead of typing letter by letter
     const plain = visual || row.layout === "text";
     if (plain) lines++;
     // the image colour on the hero, about one picture line in four (only there does it show)
     const accent = visual && Boolean(row.hero) && pictures++ % 4 === 3;
     return {
-      id: `b${String(i + 1).padStart(2, "0")}`,
-      text: row.text.trim(),
-      hero: row.hero && row.text.toLowerCase().includes(row.hero.toLowerCase()) ? row.hero : "",
-      layout: row.layout,
       entrance: visual ? order[r]! : "pop",
-      image: null,
-      candidates: [],
-      imageQuery: row.imageQuery,
       accent,
       reveal: plain && lines % 3 === 0 ? "fade" : "type",
-      voice: null,
-      voiceText: null,
-      gap: /[.?!…]$/.test(row.text.trim()) ? 0.35 : 0.08,
-      italic,
       move: moves[i]!,
       place: places[i]!,
       zone: zones[i]!,
     };
   });
+}
+
+/** Beats from the split, with the montage skill's variations already chosen. `seed` makes the video its own. */
+export function toBeats(split: Row[], seed = 0): Beat[] {
+  const rows = balanceRows(split);
+  const styles = styleRows(rows, seed);
+  let lastItalic = -9;
+  return rows.map((row, i) => {
+    // italics stay rare: never two in a row, never on the subscribe lines
+    const italic = Boolean(row.italic) && row.layout !== "mascot" && i - lastItalic > 1;
+    if (italic) lastItalic = i;
+    return {
+      id: beatId(i),
+      text: row.text.trim(),
+      hero: row.hero && row.text.toLowerCase().includes(row.hero.toLowerCase()) ? row.hero : "",
+      layout: row.layout,
+      image: null,
+      candidates: [],
+      imageQuery: row.imageQuery,
+      voice: null,
+      voiceText: null,
+      gap: /[.?!…]$/.test(row.text.trim()) ? 0.35 : 0.08,
+      italic,
+      ...styles[i]!,
+    };
+  });
+}
+
+export const beatId = (i: number) => `b${String(i + 1).padStart(2, "0")}`;
+
+/** What Claude read in each line when the script was split, kept for the next styles. */
+export function readingOf(rows: Row[], mood: Reading["mood"]): Reading {
+  return { moves: Object.fromEntries(rows.map((r, i) => [beatId(i), r.move ?? "none"])), mood };
+}
+
+/** A video already made, montaged again with another seed: same words, voices and pictures. */
+export function restyleBeats(beats: Beat[], reading: Reading, seed: number): Beat[] {
+  const rows: Row[] = beats.map((b) => ({ text: b.text, hero: b.hero, layout: b.layout, imageQuery: b.imageQuery, italic: b.italic, move: reading.moves[b.id] ?? "none" }));
+  const styles = styleRows(rows, seed);
+  return beats.map((b, i) => ({ ...b, ...styles[i]! }));
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balanceRows, drawStyle, pickMoves, pickPlaces, takeCuts, toBeats, type Row } from "../src/beats";
+import { balanceRows, drawStyle, pickMoves, pickPlaces, readingOf, restyleBeats, takeCuts, toBeats, type Row } from "../src/beats";
 
 const text = (t: string, hero = ""): Row => ({ text: t, hero, layout: "text", imageQuery: { kind: "none", queries: [] } });
 const card = (t: string, q: string): Row => ({ text: t, hero: "", layout: "card", imageQuery: { kind: "pinterest", queries: [q] } });
@@ -131,5 +131,33 @@ describe("gestures and placements", () => {
     expect(a[0]).toBe("right");
     expect(b).not.toEqual(a);
     expect(new Set(b).size).toBe(6);
+  });
+});
+
+describe("remonter autrement", () => {
+  const rows = [
+    text("En 1985, tout bascule.", "1985"),
+    card("Michael écrit la chanson", "michael jackson"),
+    card("dans sa chambre", "neverland"),
+    { ...card("et la Terre pleure", "earth"), move: "fullscreen" as const },
+    text("Personne ne l'écoute."),
+    card("Sauf un enfant", "child"),
+  ];
+
+  it("keeps the words, voice and pictures and only redraws the montage", () => {
+    const beats = toBeats(rows, 11).map((b, i) => ({ ...b, image: `img${i}`, start: i, end: i + 1 }));
+    const again = restyleBeats(beats, readingOf(rows, "lumineux"), 42);
+    again.forEach((b, i) => {
+      expect(b).toMatchObject({ id: beats[i]!.id, text: beats[i]!.text, layout: beats[i]!.layout, image: `img${i}`, start: i, end: i + 1 });
+    });
+    const montage = (bs: { entrance: string; place?: string; zone?: string; reveal: string }[]) => bs.map((b) => [b.entrance, b.place, b.zone, b.reveal].join());
+    expect(montage(again)).not.toEqual(montage(beats));
+  });
+
+  it("keeps the gestures Claude read in the lines", () => {
+    const beats = toBeats(rows, 11);
+    const reading = readingOf(rows, "sombre");
+    expect(reading.moves[beats[3]!.id]).toBe("fullscreen");
+    expect(restyleBeats(beats, reading, 7)[3]!.move).toBe("fullscreen");
   });
 });

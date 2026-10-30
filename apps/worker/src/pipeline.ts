@@ -1,4 +1,4 @@
-import { applyBeatPatch, beatContext, FPS, spokenText, timeBeats, voiceStale, type Asset, type Beat, type VideoDoc } from "@regie/core";
+import { applyBeatPatch, beatContext, FPS, snapshotStyle, spokenText, timeBeats, voiceStale, type Asset, type Beat, type Reading, type VideoDoc } from "@regie/core";
 import { createTikTokSend, getAsset, getDb, getVideo, lastTikTokSend, mutateDoc, pronunciationLexicon, setBusy, setError, setProgress, setRendered, setStatus, tiktokSendInFlight } from "@regie/db";
 import { BudgetError, enqueue, env, JOBS, providers, storage, tiktokConfigured, tiktokConnected } from "@regie/server";
 import { randomInt } from "node:crypto";
@@ -6,9 +6,9 @@ import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import pLimit from "p-limit";
 import { hasChecker, removeBackground, removeChecker } from "./background";
-import { drawStyle, takeCuts, toBeats } from "./beats";
+import { balanceRows, drawStyle, readingOf, restyleBeats, takeCuts, toBeats } from "./beats";
 import { animatedGif, ff, ingestClip, ingestImage, ingestVoice, sliceTake, storeFile, withTemp } from "./media";
-import { editBeat, splitScript, writeCaption, writeScript } from "./providers/claude";
+import { editBeat, readMoves, splitScript, writeCaption, writeScript } from "./providers/claude";
 import { demoCaption, demoImages, demoScript, demoSplit, demoVoice } from "./providers/demo";
 import { speak, speakTake } from "./providers/elevenlabs";
 import { deezerCover, fetchImage, searchPinterest } from "./providers/images";
@@ -242,8 +242,10 @@ export async function generate(videoId: string) {
     const seed = randomInt(1, 1_000_000);
     const { zoom, exit } = drawStyle(seed);
     const look = { seed, mono: split.mood === "sombre", zoom, exit };
-    beats = toBeats(split.beats, look.seed);
-    await mutateDoc(db(), videoId, "script", (d) => ({ ...d, beats, look, sources, draft: null }));
+    const rows = balanceRows(split.beats);
+    beats = toBeats(rows, look.seed);
+    const reading = readingOf(rows, split.mood);
+    await mutateDoc(db(), videoId, "script", (d) => ({ ...d, beats, look, reading, sources, draft: null }));
   }
 
   // voice: the whole script in one take when nothing is voiced yet
@@ -343,6 +345,33 @@ export async function prerender(videoId: string) {
     return now.status === "ready" && now.version === start.version;
   });
   if (n) console.log(`[prerender] ${videoId}: ${n} plans montés en avance`);
+}
+
+/**
+ * « Remonter autrement »: the same words, voices and pictures, montaged again with a new seed.
+ * Claude reads the lines once for their gestures (a video made before them); every later style is free.
+ * The montage it had before stays in `styles`, so any style tried can be put back in one click.
+ */
+export async function restyle(videoId: string) {
+  await setBusy(db(), videoId, "restyle", true);
+  try {
+    const { doc } = await load(videoId);
+    if (!doc.beats.length) return;
+    const reading: Reading = doc.reading ?? (providers().claude ? await readMoves(videoId, doc.beats) : { moves: {}, mood: "lumineux" });
+    const seed = randomInt(1, 1_000_000);
+    const { zoom, exit } = drawStyle(seed);
+    await mutateDoc(db(), videoId, "nouveau style", (d) => {
+      const tried = d.styles?.length ? d.styles : [snapshotStyle(d)];
+      const next: VideoDoc = { ...d, beats: restyleBeats(d.beats, reading, seed), look: { seed, mono: reading.mood === "sombre", zoom, exit }, reading };
+      // the first one (the montage it had before) always stays
+      const styles = [...tried, snapshotStyle(next)];
+      const kept = styles.length > 12 ? [styles[0]!, ...styles.slice(-11)] : styles;
+      return { ...next, styles: kept, styleIndex: kept.length - 1 };
+    });
+  } finally {
+    await setBusy(db(), videoId, "restyle", false);
+    await enqueue(JOBS.prerender, { videoId });
+  }
 }
 
 /** The TikTok caption, from the beats as they read now (so a « Réécrire » follows the edits). */

@@ -1,10 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { ENTRANCES, imageQuerySchema, MOVES, type Beat } from "@regie/core";
+import { ENTRANCES, imageQuerySchema, MOVES, type Beat, type Reading } from "@regie/core";
 import { getDb, recordUsage } from "@regie/db";
 import { assertBudget, claudeCost, env } from "@regie/server";
 import { z } from "zod";
-import { CAPTION_SYSTEM, EDIT_SYSTEM, SCRIPT_SYSTEM, SPLIT_SYSTEM } from "../prompts";
+import { CAPTION_SYSTEM, EDIT_SYSTEM, MOVES_SYSTEM, SCRIPT_SYSTEM, SPLIT_SYSTEM } from "../prompts";
 
 /**
  * Four calls, each sized to its job:
@@ -117,6 +117,37 @@ export async function splitScript(videoId: string, script: string) {
   checkStop(msg.stop_reason, "le découpage");
   if (!msg.parsed_output) throw new Error("Le découpage reçu n'est pas lisible.");
   return msg.parsed_output;
+}
+
+const movesSchema = z.object({
+  moves: z.array(z.object({ id: z.string(), move: z.enum(MOVES) })).max(80),
+  mood: z.enum(["lumineux", "sombre"]),
+});
+
+/** For a video made before the gestures: Claude reads its lines once, the reading is kept for every new style. */
+export async function readMoves(videoId: string, beats: Beat[]): Promise<Reading> {
+  await assertBudget(videoId);
+  const content = beats
+    .map((b, i) => {
+      const same = i > 0 && b.imageQuery.kind !== "none" && b.imageQuery.queries.join() === beats[i - 1]!.imageQuery.queries.join();
+      return `${b.id} [${b.layout}${b.hero ? `, héros « ${b.hero} »` : ""}]${same ? " (même image)" : ""} : ${b.text}`;
+    })
+    .join("\n");
+  const msg = await api().beta.messages.parse({
+    model: env().CLAUDE_MODEL,
+    max_tokens: 4000,
+    betas: BETAS,
+    fallbacks: "default",
+    output_config: { effort: "low", format: betaZodOutputFormat(movesSchema) },
+    cache_control: { type: "ephemeral" },
+    system: MOVES_SYSTEM,
+    messages: [{ role: "user", content }],
+  });
+  await logUsage(videoId, "gestes", msg.usage);
+  checkStop(msg.stop_reason, "la lecture des gestes");
+  if (!msg.parsed_output) throw new Error("La lecture des gestes n'est pas lisible.");
+  const ids = new Set(beats.map((b) => b.id));
+  return { moves: Object.fromEntries(msg.parsed_output.moves.filter((m) => ids.has(m.id)).map((m) => [m.id, m.move])), mood: msg.parsed_output.mood };
 }
 
 const editSchema = z.object({

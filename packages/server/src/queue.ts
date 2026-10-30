@@ -24,6 +24,8 @@ export const JOBS = {
   tiktok: "tiktok-send",
   /** Write the TikTok caption again, from the script as it reads now. */
   caption: "video-caption",
+  /** « Remonter autrement »: the same video montaged again with a new style. */
+  restyle: "video-restyle",
   /** Scenes rendered ahead into the cache while the shots are checked: only this server's time. */
   prerender: "video-prerender",
   /** Every night: delete the videos untouched for RETENTION_DAYS days. */
@@ -43,6 +45,7 @@ export const jobData = {
   [JOBS.caption]: z.object({ videoId: z.string().uuid() }),
   [JOBS.cleanup]: z.object({}),
   [JOBS.prerender]: z.object({ videoId: z.string().uuid() }),
+  [JOBS.restyle]: z.object({ videoId: z.string().uuid() }),
 };
 
 export type JobName = (typeof JOBS)[keyof typeof JOBS];
