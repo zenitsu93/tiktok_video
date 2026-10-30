@@ -10,7 +10,7 @@ import { editBeat, splitScript, writeCaption, writeScript } from "./providers/cl
 import { demoCaption, demoImages, demoScript, demoSplit, demoVoice } from "./providers/demo";
 import { speak, speakTake } from "./providers/elevenlabs";
 import { deezerCover, fetchImage, searchPinterest } from "./providers/images";
-import { exportVideo } from "./render";
+import { exportVideo, prerenderScenes } from "./render";
 
 const db = () => getDb();
 
@@ -20,13 +20,14 @@ async function load(videoId: string) {
   return row;
 }
 
-/** Wraps a one-beat job so the line shows a spinner while it runs. */
+/** Wraps a one-beat job so the line shows a spinner while it runs, then gets the changed scene made ahead. */
 async function onBeat<T>(videoId: string, beatId: string, fn: () => Promise<T>): Promise<T> {
   await setBusy(db(), videoId, beatId, true);
   try {
     return await fn();
   } finally {
     await setBusy(db(), videoId, beatId, false);
+    await enqueue(JOBS.prerender, { videoId });
   }
 }
 
@@ -108,12 +109,16 @@ export async function remixVoice(videoId: string) {
 
 // ---------------------------------------------------------------- images
 
+/** Words added to a search for « Autres images », one more per click. */
+const VARIANTS = ["vintage", "aesthetic", "photo", "close up", "black and white", "editorial", "film still", "candid"];
+
 /**
  * Downloads up to `want` new candidates for a set of beats that share one idea, and says how many came.
  * `select` makes the first new image the shown one (used when Thomas asked for another image).
- * `deeper` reads further down the same searches: the first results are already in the candidates.
+ * `fresh` varies the same searches (« … vintage », « … aesthetic »…), so another click brings other
+ * pins for the same price: Apify bills every pin it returns, so asking for more is not the way.
  */
-export async function imagesFor(videoId: string, beatIds: string[], opts: { queries?: string[]; select?: boolean; want?: number; deeper?: boolean } = {}) {
+export async function imagesFor(videoId: string, beatIds: string[], opts: { queries?: string[]; select?: boolean; want?: number; fresh?: boolean } = {}) {
   const { doc } = await load(videoId);
   const beats = doc.beats.filter((b) => beatIds.includes(b.id));
   const first = beats[0];
@@ -129,8 +134,8 @@ export async function imagesFor(videoId: string, beatIds: string[], opts: { quer
   } else if (query.kind === "pinterest") {
     if (providers().images) {
       const urls: string[] = [];
-      const pins = opts.deeper ? Math.min(30, want + first.candidates.length) : want;
-      for (const q of query.queries) urls.push(...(await searchPinterest(videoId, q, pins)));
+      const variant = opts.fresh ? ` ${VARIANTS[Math.floor(first.candidates.length / want) % VARIANTS.length]}` : "";
+      for (const q of query.queries) urls.push(...(await searchPinterest(videoId, q + variant, want)));
       for (const url of [...new Set(urls)].filter((u) => !known.has(u))) {
         if (added.length >= want) break;
         try {
@@ -254,7 +259,8 @@ export async function generate(videoId: string) {
   // groups that already have images were done before a cut
   const done = new Set((await load(videoId)).doc.beats.filter((b) => b.candidates.length).map((b) => b.id));
   const todo = groups.filter((g) => !g.every((id) => done.has(id)));
-  const imageLimit = pLimit(2);
+  // four ideas at a time (Apify runs five at most): the same searches, just sooner
+  const imageLimit = pLimit(4);
   let found = groups.length - todo.length;
   const failed: { beats: string[]; error: Error }[] = [];
   await Promise.all(
@@ -285,8 +291,21 @@ export async function generate(videoId: string) {
   if (!(await load(videoId)).doc.cover) await coverFor(videoId);
   // a caption that fails does not hold the video back: the « Écrire la légende » button retries it
   if (!(await load(videoId)).doc.caption) await caption(videoId).catch((e) => console.warn("[légende]", (e as Error).message));
-  // the montage waits for Thomas too: he checks the shots, then « Monter la vidéo » (which then goes to TikTok)
+  // the montage waits for Thomas too: he checks the shots, then « Monter la vidéo » (which then goes to TikTok);
+  // meanwhile the scenes are made ahead, so that click has little left to do
   await setStatus(db(), videoId, "ready");
+  await enqueue(JOBS.prerender, { videoId });
+}
+
+/** The head start (see prerenderScenes): runs while the video waits at « ready », stops at the first change. */
+export async function prerender(videoId: string) {
+  const start = await load(videoId);
+  if (start.status !== "ready" || start.doc.beats.some((b) => !b.voice)) return;
+  const n = await prerenderScenes(start.doc, async () => {
+    const now = await load(videoId);
+    return now.status === "ready" && now.version === start.version;
+  });
+  if (n) console.log(`[prerender] ${videoId}: ${n} plans montés en avance`);
 }
 
 /** The TikTok caption, from the beats as they read now (so a « Réécrire » follows the edits). */
@@ -354,8 +373,8 @@ export async function moreImages(videoId: string, beatId: string, instruction?: 
       const plain = (instruction ?? (beat.hero || beat.text)).replace(/[^\p{L}\p{N}' -]/gu, " ").trim();
       added = await imagesFor(videoId, [beatId], { queries: queries?.length ? queries : [plain], select: true, want: 4 });
     } else {
-      // no model call: the same searches, further down the results
-      added = await imagesFor(videoId, [beatId], { want: 4, deeper: true });
+      // no model call: the same searches, varied, four pins each
+      added = await imagesFor(videoId, [beatId], { want: 4, fresh: true });
     }
     // the button must not look dead: say so, and how to get something else
     if (!added) await setError(db(), videoId, `Pas de nouvelle image pour ${beatId}. Décris ce que tu veux dans la barre : « @${beatId} une photo de … »`);

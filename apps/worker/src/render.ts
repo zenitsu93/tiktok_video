@@ -46,6 +46,39 @@ async function renderScene(s: HashedScene, doc: VideoDoc, out: string) {
   });
 }
 
+// Chrome slots shared by the export and the scenes made ahead: the server never runs more of them
+const chrome = pLimit(Number(process.env.RENDER_SCENES_IN_PARALLEL ?? 2));
+
+/** Puts one scene in the cache through Chrome. */
+async function renderToCache(s: HashedScene, doc: VideoDoc, file: string) {
+  await chrome(() => renderScene(s, doc, file));
+  const key = `renders/scenes/${s.hash}.mp4`;
+  await storage().put(key, await readFile(file), "video/mp4");
+  await saveSceneRender(getDb(), s.hash, key);
+}
+
+async function cachedScene(hash: string) {
+  const cached = await getSceneRender(getDb(), hash);
+  return cached && (await storage().exists(cached.storageKey)) ? cached : null;
+}
+
+/**
+ * Renders into the cache, ahead of the export, the scenes it will need: while Thomas checks
+ * the shots, they are made one by one, so « Monter la vidéo » only has the changed ones left.
+ * Only this server's time: no model, no paid API. Stops between two scenes as soon as
+ * `keepGoing` says no (the document changed, or the export started and takes over).
+ */
+export async function prerenderScenes(doc: VideoDoc, keepGoing: () => Promise<boolean>): Promise<number> {
+  let rendered = 0;
+  for (const s of hashedScenes(doc).scenes) {
+    if (!(await keepGoing())) break;
+    if (await cachedScene(s.hash)) continue;
+    await withTemp((dir) => renderToCache(s, doc, join(dir, "scene.mp4")));
+    rendered++;
+  }
+  return rendered;
+}
+
 /**
  * Exports the video. Scenes whose hash is already in the cache are reused as is,
  * so after a one-beat edit only that beat's scene goes through Chrome again.
@@ -56,27 +89,20 @@ export async function exportVideo(videoId: string, doc: VideoDoc, onProgress: (d
   const started = Date.now();
   let rendered = 0;
   let done = 0;
-  const limit = pLimit(Number(process.env.RENDER_SCENES_IN_PARALLEL ?? 2));
   await onProgress(0, scenes.length);
   return withTemp(async (dir) => {
     const files = await Promise.all(
-      scenes.map((s, i) =>
-        limit(async () => {
-          const file = join(dir, `${String(i).padStart(3, "0")}.mp4`);
-          const key = `renders/scenes/${s.hash}.mp4`;
-          const cached = await getSceneRender(db, s.hash);
-          if (cached && (await storage().exists(cached.storageKey))) {
-            await storage().download(cached.storageKey, file);
-          } else {
-            await renderScene(s, doc, file);
-            await storage().put(key, await readFile(file), "video/mp4");
-            await saveSceneRender(db, s.hash, key);
-            rendered++;
-          }
-          await onProgress(++done, scenes.length);
-          return file;
-        }),
-      ),
+      scenes.map(async (s, i) => {
+        const file = join(dir, `${String(i).padStart(3, "0")}.mp4`);
+        const cached = await cachedScene(s.hash);
+        if (cached) await storage().download(cached.storageKey, file);
+        else {
+          await renderToCache(s, doc, file);
+          rendered++;
+        }
+        await onProgress(++done, scenes.length);
+        return file;
+      }),
     );
 
     // join the clips without re-encoding, then lay the voice track under them
