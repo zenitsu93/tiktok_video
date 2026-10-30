@@ -83,7 +83,8 @@ export async function voiceLevelFilter(path: string): Promise<string> {
   const ok = ["input_i", "input_tp", "input_lra", "input_thresh", "target_offset"].every((k) => Number.isFinite(Number(m[k])));
   // a silent track measures -inf: leave it as it is
   if (!ok) return VOICE_SHAPE;
-  return `${VOICE_SHAPE},loudnorm=${target}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true,aresample=44100`;
+  // aformat pins the layout: without it ffmpeg 5.1 (the server's) cannot pick one after loudnorm and the export fails
+  return `${VOICE_SHAPE},loudnorm=${target}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true,aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo`;
 }
 
 export async function audioDuration(path: string): Promise<number> {
