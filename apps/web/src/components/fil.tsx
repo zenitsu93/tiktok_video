@@ -765,7 +765,7 @@ function Inspector({
   const [drag, setDrag] = useState(false);
   // « Ma photo »: the file goes as it is, the worker cleans it and shows it on this line
   async function upload(f: File) {
-    if (f.size > 9_500_000) return notify.flash("Image trop lourde (9 Mo au plus).", true);
+    if (f.size > 9_500_000) return notify.flash("Fichier trop lourd (9 Mo au plus).", true);
     try {
       const r = await fetch(`/api/videos/${v.id}/beats/${b.id}/image`, { method: "POST", headers: { "content-type": f.type }, body: f });
       const data = await r.json().catch(() => ({}));
@@ -867,6 +867,11 @@ function Inspector({
                 <button key={c} aria-pressed={pressed} onClick={pick} aria-label={showCut ? "Choisir cette image, fond nettoyé" : "Choisir cette image"} className={showCut ? "cut" : undefined}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={(showCut ? cut! : img).url} alt="" loading="lazy" />
+                  {img.clip && (
+                    <span className="clipmark" aria-label="GIF ou vidéo">
+                      <Play size={10} />
+                    </span>
+                  )}
                   {showCut && (
                     <span className="scissors" aria-hidden="true">
                       <Scissors size={11} />
@@ -878,7 +883,7 @@ function Inspector({
             })}
           </div>
         )}
-        {current && imageLayouts && (
+        {current && imageLayouts && !v.images[current]?.clip && (
           <div className="bgrow">
             <div className="bgseg" data-v={isClean ? "clean" : "orig"} role="group" aria-label="Fond de l'image">
               <span className="thumb" aria-hidden="true" />
@@ -910,11 +915,11 @@ function Inspector({
           <button className="btn sm" disabled={busy} onClick={() => action("images", undefined, "Recherche d'autres images…")}>
             <ImageIcon size={14} /> Autres images
           </button>
-          <label className={`btn sm${busy ? " off" : ""}`} title="Ta propre image, depuis ton ordinateur ou ton téléphone (ou glisse-la ici)">
+          <label className={`btn sm${busy ? " off" : ""}`} title="Ta propre image, un GIF ou une courte vidéo, depuis ton ordinateur ou ton téléphone (ou glisse-le ici)">
             <ImagePlus size={14} /> Ma photo
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
               hidden
               disabled={busy}
               onChange={(e) => {

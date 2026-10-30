@@ -58,6 +58,8 @@ export const assetSchema = z.object({
   clean: z.string().max(80).optional(),
   /** The original came with a flattened checkerboard instead of a background: it is shown cut out. */
   checker: z.boolean().optional(),
+  /** A clip (GIF or short video Thomas brought): its first frame, an image asset, for thumbnails and the accent. */
+  poster: z.string().max(80).optional(),
 });
 export type Asset = z.infer<typeof assetSchema>;
 

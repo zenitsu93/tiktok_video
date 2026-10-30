@@ -222,19 +222,22 @@ function sceneParts(scene: Scene, ctx: ComposeContext, base: number): Parts {
     }
     const left = Math.round((W - w) / 2);
     const top = CARD_CY - Math.round(h / 2);
+    // a clip (GIF or video) always plays in a card, muted; the renderer times it from the scene's wrapper
+    const clip = asset.kind === "video";
+    const cls = scene.kind === "card" || clip ? "card" : "cut";
     textTop = top + h + 46;
-    textLeft = scene.kind === "card" ? left : null;
-    const cls = scene.kind === "card" ? "card" : "cut";
+    textLeft = cls === "card" ? left : null;
+    const media = clip ? `<video src="${esc(ctx.src(scene.image))}" muted playsinline preload="auto"></video>` : `<img src="${esc(ctx.src(scene.image))}" alt="">`;
     html.push(
       `<div id="${sid}" class="clip" data-start="${t3(s0)}" data-duration="${t3(dur)}" data-track-index="${1 + (scene.index % 2)}">` +
         `<div class="inner" style="left:${left}px;top:${top}px;width:${w}px;height:${h}px">` +
-        `<div class="${cls}"><img src="${esc(ctx.src(scene.image))}" alt=""></div></div></div>`,
+        `<div class="${cls}">${media}</div></div></div>`,
     );
     js.push(...entranceJs(`#${sid} .inner`, first.entrance, s0));
-    // soft zoom on the picture for the whole hold, alternating in and out
+    // soft zoom on the picture for the whole hold, alternating in and out (a clip moves on its own)
     const [z0, z1] = scene.index % 2 === 0 ? [1, 1.12] : [1.12, 1];
     const zc = scene.kind === "cutout" ? [1, 1.05] : [z0, z1];
-    js.push(`tl.fromTo("#${sid} img",{scale:${zc[0]}},{scale:${zc[1]},duration:${t3(dur)},ease:"sine.inOut"},${t3(s0)});`);
+    if (!clip) js.push(`tl.fromTo("#${sid} img",{scale:${zc[0]}},{scale:${zc[1]},duration:${t3(dur)},ease:"sine.inOut"},${t3(s0)});`);
     // collapse to a point at the end of the idea (every other scene, the rest cut to white)
     if (dur > 0.9 && scene.index % 2 === 0) {
       js.push(`tl.to("#${sid} .inner",{scale:0,duration:0.15,ease:"inquick"},${t3(s0 + dur - 0.17)});`);
@@ -506,7 +509,9 @@ html, body { width:${W}px; height:${H}px; overflow:hidden; background:#ffffff; }
 .clip { position:absolute; inset:0; }
 .inner { position:absolute; transform-origin:50% 50%; }
 .card { width:100%; height:100%; border-radius:7%/5.6%; overflow:hidden; }
-.card img { width:100%; height:100%; object-fit:cover; display:block; }
+.card img, .card video { width:100%; height:100%; object-fit:cover; display:block; }
+/* the renderer draws a video's frames on its own layer: it takes the card's corners itself */
+.card video { border-radius:inherit; clip-path:inset(0 round 7% / 5.6%); }
 .cut img { width:100%; height:100%; object-fit:contain; display:block; }
 .disc { width:100%; height:100%; border-radius:50%; background:repeating-radial-gradient(circle,#151515 0 6px,#232323 6px 8px); display:flex; align-items:center; justify-content:center; }
 .stage { position:absolute; left:0; top:520px; width:${W}px; height:600px; transform-origin:50% 50%; }

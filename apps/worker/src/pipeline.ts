@@ -6,7 +6,7 @@ import { extname, join } from "node:path";
 import pLimit from "p-limit";
 import { hasChecker, removeBackground, removeChecker } from "./background";
 import { takeCuts, toBeats } from "./beats";
-import { ff, ingestImage, ingestVoice, sliceTake, storeFile, withTemp } from "./media";
+import { animatedGif, ff, ingestClip, ingestImage, ingestVoice, sliceTake, storeFile, withTemp } from "./media";
 import { editBeat, splitScript, writeCaption, writeScript } from "./providers/claude";
 import { demoCaption, demoImages, demoScript, demoSplit, demoVoice } from "./providers/demo";
 import { speak, speakTake } from "./providers/elevenlabs";
@@ -419,18 +419,28 @@ export async function moreImages(videoId: string, beatId: string, instruction?: 
  * An image Thomas uploaded for a beat (when the search found nothing, or the budget ran out):
  * cleaned like any other (decoded, stripped, resized), put first among the candidates and shown.
  * `also`: the other beats of the same idea (La Planche gives one picture to the whole idea).
+ * A GIF or a short video becomes a silent looping clip, always shown in a card.
  */
-export async function ownImage(videoId: string, beatId: string, key: string, also: string[] = []) {
+export async function ownImage(videoId: string, beatId: string, key: string, also: string[] = [], mime?: string) {
   const ids = new Set([beatId, ...also]);
   await onBeat(videoId, beatId, async () => {
     try {
-      const asset = await ingestImage(await storage().read(key), "moi");
-      await mutateDoc(db(), videoId, `${[...ids].join(",")} : ma photo`, (d) => ({
+      const file = await storage().read(key);
+      const moving = mime?.startsWith("video/") || (mime === "image/gif" && (await animatedGif(file)));
+      const { clip, poster } = moving ? await ingestClip(file, mime!, "moi") : { clip: null, poster: null };
+      const asset = clip ?? (await ingestImage(file, "moi"));
+      await mutateDoc(db(), videoId, `${[...ids].join(",")} : ${clip ? "mon extrait" : "ma photo"}`, (d) => ({
         ...d,
-        assets: { ...d.assets, [asset.id]: asset },
+        assets: { ...d.assets, [asset.id]: asset, ...(poster ? { [poster.id]: poster } : {}) },
         beats: d.beats.map((b) =>
           ids.has(b.id)
-            ? { ...b, image: asset.id, candidates: [asset.id, ...b.candidates.filter((c) => c !== asset.id)], layout: b.layout === "card" || b.layout === "cutout" ? b.layout : ("card" as const) }
+            ? {
+                ...b,
+                image: asset.id,
+                candidates: [asset.id, ...b.candidates.filter((c) => c !== asset.id)],
+                // a clip has no cut-out: it plays in a card
+                layout: clip ? ("card" as const) : b.layout === "card" || b.layout === "cutout" ? b.layout : ("card" as const),
+              }
             : b,
         ),
       }));
@@ -446,6 +456,7 @@ export async function cleanImage(videoId: string, beatId: string) {
     const beat = doc.beats.find((b) => b.id === beatId);
     const original = beat?.candidates.find((c) => c === beat.image || doc.assets[c]?.clean === beat.image);
     if (!beat || !original) throw new Error(`Le plan ${beatId} n'a pas d'image à détourer.`);
+    if (doc.assets[original]?.kind === "video") throw new Error("Un GIF ou une vidéo ne se détoure pas : il reste dans sa carte.");
     let cleanId = doc.assets[original]?.clean;
     let clean: Asset | undefined;
     if (!cleanId) {

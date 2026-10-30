@@ -142,6 +142,45 @@ async function saveVoice(body: Buffer, source: string, duration: number, ext = "
   return { id, kind: "audio", mime, duration, source };
 }
 
+/** Longest a clip is kept: the source is looped up to it, so a 2 s GIF still fills a long scene. */
+const CLIP_SECONDS = 12;
+
+/**
+ * A GIF or a short video Thomas brought for a beat: re-encoded into a silent H.264 MP4
+ * (nothing of the original file reaches the renderer), looped up to CLIP_SECONDS because the
+ * renderer plays a clip once from the scene's start. Its first frame becomes the poster image.
+ */
+export async function ingestClip(input: Buffer, mime: string, source: string): Promise<{ clip: Asset; poster: Asset }> {
+  return withTemp(async (dir) => {
+    const src = join(dir, mime === "image/gif" ? "in.gif" : "in.bin");
+    const out = join(dir, "out.mp4");
+    const frame = join(dir, "poster.png");
+    await writeFile(src, input);
+    // a GIF loops through its own demuxer; a video through stream_loop
+    const loop = mime === "image/gif" ? ["-ignore_loop", "0"] : ["-stream_loop", "-1"];
+    await ff(
+      "ffmpeg",
+      [
+        "-y", "-loglevel", "error", ...loop, "-i", src, "-t", String(CLIP_SECONDS), "-an",
+        "-vf", `fps=${FPS},scale='min(900,iw)':-2:flags=lanczos,format=yuv420p`,
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart", out,
+      ],
+      180_000,
+    );
+    await ff("ffmpeg", ["-y", "-loglevel", "error", "-i", out, "-frames:v", "1", frame]);
+    const poster = await ingestImage(await readFile(frame), `${source}#image`);
+    const body = await readFile(out);
+    const clip = await storeFile("v", body, "video/mp4", "mp4", "video", source);
+    return { clip: { ...clip, width: poster.width, height: poster.height, accent: poster.accent, duration: CLIP_SECONDS, poster: poster.id }, poster };
+  });
+}
+
+/** An animated GIF (more than one frame): a clip rather than an image. */
+export async function animatedGif(input: Buffer): Promise<boolean> {
+  const meta = await sharp(input, { animated: true, limitInputPixels: 64_000_000 }).metadata().catch(() => null);
+  return (meta?.pages ?? 1) > 1;
+}
+
 export async function storeFile(prefix: string, body: Buffer, mime: string, ext: string, kind: Asset["kind"], source: string): Promise<Asset> {
   const id = idOf(prefix, body);
   const key = `assets/${id}.${ext}`;

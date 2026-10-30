@@ -44,7 +44,7 @@ function ideasOf(beats: BeatView[]): Idea[] {
 /** The picture from the clipboard (« Copier l'image » in the browser), when there is one. */
 function pasted(e: ClipboardEvent): File | null {
   for (const item of e.clipboardData?.items ?? []) {
-    if (item.kind === "file" && item.type.startsWith("image/")) return item.getAsFile();
+    if (item.kind === "file" && (item.type.startsWith("image/") || item.type.startsWith("video/"))) return item.getAsFile();
   }
   return null;
 }
@@ -67,8 +67,8 @@ export function Planche({ v, notify, onSearch }: { v: VideoView; notify: Notify;
   const left = ideas.filter((i) => !filled(i));
 
   async function upload(idea: Idea, f: File) {
-    if (!f.type.startsWith("image/")) return notify.flash("Ce n'est pas une image.", true);
-    if (f.size > 9_500_000) return notify.flash("Image trop lourde (9 Mo au plus).", true);
+    if (!f.type.startsWith("image/") && !f.type.startsWith("video/")) return notify.flash("Ce n'est ni une image, ni un GIF, ni une vidéo.", true);
+    if (f.size > 9_500_000) return notify.flash("Fichier trop lourd (9 Mo au plus).", true);
     const [first, ...also] = idea.need;
     setSent((s) => ({ ...s, [idea.key]: Date.now() }));
     // the next empty idea lights up straight away: no waiting for the worker
@@ -126,7 +126,8 @@ export function Planche({ v, notify, onSearch }: { v: VideoView; notify: Notify;
       </div>
       <p className="mute planche-help">
         « Pinterest » ouvre la recherche toute prête. Clic droit sur l&apos;image, « Copier l&apos;image », puis <kbd>Ctrl</kbd>+<kbd>V</kbd> ici : elle va dans la case rouge et la suivante
-        s&apos;allume. Tu peux aussi glisser un fichier sur une case, ou la toucher pour choisir une photo.
+        s&apos;allume. Tu peux aussi glisser un fichier sur une case, ou la toucher pour choisir une photo. Un GIF ou une courte vidéo marche aussi :
+        enregistre-le, puis glisse-le dans la case (il joue en boucle, sans le son).
       </p>
       <div className="planche-grid">
         {ideas.map((idea) => (
@@ -220,6 +221,8 @@ function Tile({
           <span className="tile-wait">
             <Loader2 size={18} className="spin" /> L&apos;image arrive…
           </span>
+        ) : img?.clip ? (
+          <video src={img.clip} poster={img.url} muted loop autoPlay playsInline />
         ) : img ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={img.url} alt="" loading="lazy" />
@@ -236,7 +239,7 @@ function Tile({
         )}
         <input
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
           hidden
           disabled={busy}
           onChange={(e) => {
