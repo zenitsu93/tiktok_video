@@ -50,11 +50,11 @@ async function renderScene(s: HashedScene, doc: VideoDoc, out: string) {
 const chrome = pLimit(Number(process.env.RENDER_SCENES_IN_PARALLEL ?? 2));
 
 /** Puts one scene in the cache through Chrome. */
-async function renderToCache(s: HashedScene, doc: VideoDoc, file: string) {
+async function renderToCache(videoId: string, s: HashedScene, doc: VideoDoc, file: string) {
   await chrome(() => renderScene(s, doc, file));
   const key = `renders/scenes/${s.hash}.mp4`;
   await storage().put(key, await readFile(file), "video/mp4");
-  await saveSceneRender(getDb(), s.hash, key);
+  await saveSceneRender(getDb(), s.hash, key, videoId);
 }
 
 async function cachedScene(hash: string) {
@@ -68,12 +68,12 @@ async function cachedScene(hash: string) {
  * Only this server's time: no model, no paid API. Stops between two scenes as soon as
  * `keepGoing` says no (the document changed, or the export started and takes over).
  */
-export async function prerenderScenes(doc: VideoDoc, keepGoing: () => Promise<boolean>): Promise<number> {
+export async function prerenderScenes(videoId: string, doc: VideoDoc, keepGoing: () => Promise<boolean>): Promise<number> {
   let rendered = 0;
   for (const s of hashedScenes(doc).scenes) {
     if (!(await keepGoing())) break;
     if (await cachedScene(s.hash)) continue;
-    await withTemp((dir) => renderToCache(s, doc, join(dir, "scene.mp4")));
+    await withTemp((dir) => renderToCache(videoId, s, doc, join(dir, "scene.mp4")));
     rendered++;
   }
   return rendered;
@@ -97,7 +97,7 @@ export async function exportVideo(videoId: string, doc: VideoDoc, onProgress: (d
         const cached = await cachedScene(s.hash);
         if (cached) await storage().download(cached.storageKey, file);
         else {
-          await renderToCache(s, doc, file);
+          await renderToCache(videoId, s, doc, file);
           rendered++;
         }
         await onProgress(++done, scenes.length);
