@@ -39,6 +39,8 @@ export interface VideoView {
   draft: string | null;
   /** The TikTok caption with its hashtags, to paste in TikTok. */
   caption: string | null;
+  /** The mixed voice, played by the page under the preview frame. */
+  voice: string | null;
   /** How the voice says some words, for every video (the screen keeps the spelling). */
   pronunciations: { word: string; say: string }[];
   /** Beat ids a job is working on, and "caption" while the caption is being written. */
@@ -115,6 +117,7 @@ export async function videoView(row: VideoRow): Promise<VideoView> {
     sources: doc.sources,
     draft: doc.beats.length ? null : (doc.draft ?? null),
     caption: doc.caption ?? null,
+    voice: doc.voiceTrack ? signMedia(doc.voiceTrack, 6 * 3600) : null,
     pronunciations,
     busy: row.busyBeats,
     dirty: row.renderAsset && doc.beats.length ? dirtyBeats(doc, row.renderedScenes) : [],
