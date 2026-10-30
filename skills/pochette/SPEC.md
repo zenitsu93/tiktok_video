@@ -1,4 +1,30 @@
-# Intro / sortie « Pochette » (générique, toutes chansons)
+# Couverture, intro et sortie « Pochette » (générique, toutes chansons)
+
+## Couverture « bac à disques » (ouverture par défaut, `--opening cover`)
+Frame 0 complète, utilisable comme cover TikTok ; la dernière image est identique (boucle).
+- Pochette 600×600 à left 120, top 520, rotation −3°, coins 18 px. Vinyle derrière, décalé de +210 px (x:90 sur la scène), il tourne (160°/s) et glisse jusqu'à x:130 pendant la tenue (`inout`).
+- « Tu connais l'histoire de » : Regular 400, 68 px, top 330, left 120.
+- Titre + virgule : Black Italic 900, top 1180, left 120, taille = 840 px de large (plafond 190 px).
+- « de <Artiste> ? » : Regular 400, 76 px, sous le titre (top 1180 + 0.95 × taille).
+- Zone sûre : tout entre y 240 et 1680 (recadrage 3:4 de la grille du profil).
+
+| t | ouverture (durée hold + 1.1 s, hold = 2 s) |
+|---|---|
+| 0 → H | tenue, vinyle x 90→130 |
+| H | textes y→−40, opacity 0, flou, 0.4 s, inquick, stagger 0.06 ; pochette x→−1000, rotation −16°, opacity 0, 0.6 s, inquick ; vinyle x→0, 0.7 s, inout |
+| H+0.75 | scène scale→0, 0.3 s, inquick |
+
+| t | fin en boucle (2.6 s) |
+|---|---|
+| 0 | scène pope : scale 0→1.06 (0.3 s, back.out(1.6)) → 1 (0.18 s) |
+| E−1.55 | pochette revient (x −120, rotation −3°, opacity 1, 0.5 s, smooth) ; vinyle x→90 (0.5 s, inout) |
+| E−1.2 | ligne du haut, titre, artiste : y 40→0, flou 10→0, opacity 0→1, 0.5 s, smooth, stagger 0.08 |
+
+Les fromTo placés après 0 ont `immediateRender:false`.
+
+---
+
+# Ancienne intro animée (`--opening pochette`)
 
 Générateur : `pochette.py` (même dossier). Rien n'est figé sur une chanson : on lui passe la pochette, le titre et l'artiste.
 

@@ -5,13 +5,17 @@ Usage :
       --fonts chemin/vers/fonts --mode intro --out dossier_projet
   puis : cd dossier_projet && npx hyperframes render --quality delivery --output intro.mp4
 
---mode intro : 3 s (entrée + tenue). --mode outro : 2.6 s (tenue + sortie). --mode both : 6 s (démo).
+--opening cover (défaut) : la vidéo s'ouvre sur la couverture « bac à disques » (pochette à gauche, vinyle qui en sort,
+  titre aligné à gauche), nette dès la frame 0 pour servir de cover TikTok ; la sortie revient exactement sur cette image
+  pour que la boucle soit invisible.  --opening pochette : ancienne intro animée (pochette floue -> vinyle -> titre centré).
+--mode intro : ouverture seule. --mode outro : sortie seule (2.6 s). --mode both : les deux à la suite (démo).
+--hold : durée de tenue de la couverture (2.0 s par défaut).
 Le dossier --fonts doit contenir les graisses Regular et Black de Kaneda (ex. brand/fonts/kaneda/ du dépôt) ;
 la Black Italic est utilisée si elle est là, sinon l'italique est synthétisé.
 gsap.min.js et CustomEase.min.js sont copiés depuis --gsap (dossier vendor/npm/gsap@*/dist de HyperFrames).
 """
 import argparse, html, json, os, shutil
-from PIL import Image
+from PIL import Image, ImageFont
 
 ap = argparse.ArgumentParser()
 ap.add_argument('--cover', required=True)
@@ -21,6 +25,8 @@ ap.add_argument('--hook', default="Tu connais l'histoire de")
 ap.add_argument('--fonts', required=True)
 ap.add_argument('--gsap', required=True)
 ap.add_argument('--mode', choices=['intro', 'outro', 'both'], default='both')
+ap.add_argument('--opening', choices=['cover', 'pochette'], default='cover')
+ap.add_argument('--hold', type=float, default=2.0)
 ap.add_argument('--out', required=True)
 a = ap.parse_args()
 
@@ -62,15 +68,46 @@ json.dump({'name': 'pochette', 'private': True, 'type': 'module',
           open(os.path.join(a.out, 'package.json'), 'w'), indent=2)
 
 INTRO, OUTRO = a.mode in ('intro', 'both'), a.mode in ('outro', 'both')
-T = {'intro': 3.0, 'outro': 2.6, 'both': 6.0}[a.mode]
+COVER = a.opening == 'cover'
+H = a.hold
+TI = H + 1.1 if COVER else 3.0  # durée de l'ouverture
+T = {'intro': TI, 'outro': 2.6, 'both': TI + 2.6 if COVER else 6.0}[a.mode]
 E = T  # fin de la composition
+O = TI if (COVER and a.mode == 'both') else 0  # début de la partie sortie
 
 def chars(t, cls=''):
     c = f' {cls}' if cls else ''
     return ' '.join(f'<span class="w{c}">' + ''.join(f'<span class="ch">{html.escape(ch)}</span>' for ch in w) + '</span>' for w in t.split(' '))
 
 js = ['tl.fromTo("#vin .spin",{rotation:0},{rotation:%d,duration:%s,ease:"none"},0)' % (round(160 * T), T)]
-if INTRO:
+# couverture « bac à disques » (les fromTo placés plus tard ont immediateRender:false pour ne pas vider la frame 0) : pochette décalée à gauche, vinyle qui en sort à droite
+CS, CV = '{x:-120,rotation:-3,opacity:1}', '{x:90}'
+if COVER:
+    js += [f'tl.set("#sleeve",{CS},0)', f'tl.set("#vin",{CV},0)']
+if COVER and INTRO:
+    js += [
+        # tenue : le vinyle glisse encore un peu hors de la pochette
+        f'tl.to("#vin",{{x:130,duration:{H},ease:"inout"}},0)',
+        f'tl.to(["#chook","#ctitle","#cart"],{{y:-40,opacity:0,filter:"blur(10px)",duration:0.4,ease:"inquick",stagger:0.06}},{H})',
+        f'tl.to("#sleeve",{{x:-1000,rotation:-16,opacity:0,duration:0.6,ease:"inquick"}},{H})',
+        f'tl.to("#vin",{{x:0,duration:0.7,ease:"inout"}},{H})',
+        f'tl.to(".stage",{{scale:0,duration:0.3,ease:"inquick"}},{H + 0.75:.2f})',
+    ]
+if COVER and OUTRO:
+    js += [
+        f'tl.set("#sleeve",{{x:-1000,rotation:-16,opacity:0}},{O})',
+        f'tl.set("#vin",{{x:0}},{O})',
+        f'tl.set(["#chook","#ctitle","#cart"],{{opacity:0}},{O})',
+        f'tl.fromTo(".stage",{{scale:0}},{{scale:1.06,duration:0.3,ease:"back.out(1.6)",immediateRender:false}},{O})',
+        f'tl.to(".stage",{{scale:1,duration:0.18,ease:"smooth"}},{O + 0.3:.2f})',
+        # retour exact sur l'image de couverture (boucle TikTok)
+        f'tl.to("#sleeve",{{x:-120,rotation:-3,opacity:1,duration:0.5,ease:"smooth"}},{E - 1.55:.2f})',
+        f'tl.to("#vin",{{x:90,duration:0.5,ease:"inout"}},{E - 1.55:.2f})',
+        f'tl.fromTo(["#chook","#ctitle","#cart"],{{y:40,opacity:0,filter:"blur(10px)"}},{{y:0,opacity:1,filter:"blur(0px)",duration:0.5,ease:"smooth",stagger:0.08,immediateRender:false}},{E - 1.2:.2f})',
+    ]
+if COVER:
+    pass
+elif INTRO:
     js += [
         # la pochette arrive (flou -> net), le vinyle en sort, la pochette s'envole
         'tl.fromTo("#sleeve",{scale:0.6,y:220,opacity:0,filter:"blur(24px)"},{scale:1,y:0,opacity:1,filter:"blur(0px)",duration:0.75,ease:"smooth"},0)',
@@ -82,11 +119,11 @@ if INTRO:
         'tl.fromTo("#top .ch",{opacity:0,color:"#c8c8c8"},{opacity:1,color:"#111",duration:0.06,stagger:0.035},0.25)',
         'tl.fromTo("#title .w",{y:90,opacity:0,filter:"blur(12px)"},{y:0,opacity:1,filter:"blur(0px)",duration:0.6,ease:"smooth",stagger:0.09},1.55)',
     ]
-else:
+else:  # sortie seule, ouverture pochette
     js += ['tl.set("#sleeve",{x:-1000,rotation:-16,opacity:0},0)',
            'tl.fromTo(".stage",{scale:0},{scale:1.06,duration:0.3,ease:"back.out(1.6)"},0)',
            'tl.to(".stage",{scale:1,duration:0.18,ease:"smooth"},0.3)']
-if OUTRO:
+if OUTRO and not COVER:
     js += [
         # le titre s'efface, la pochette revient, le vinyle rentre dedans, tout se réduit à un point
         f'tl.to(["#top","#title"],{{y:-40,opacity:0,filter:"blur(10px)",duration:0.4,ease:"inquick",stagger:0.06}},{E - 1.55:.2f})',
@@ -98,6 +135,15 @@ if OUTRO:
     ]
 
 title = f'{chars(a.title + ",", "k it")} {chars("de " + a.artist + " ?")}'
+# couverture : titre ajusté à 840 px de large (plafond 190 px), mesuré avec la vraie police
+TF = os.path.join(a.out, 'assets/fonts', FONTS.get('blackitalic', FONTS['black']))
+CTS = min(190, int(100 * 840 / ImageFont.truetype(TF, 100).getlength(a.title + ',')))
+if COVER:
+    texts = (f'<div id="chook" class="cline" style="top:330px;font-size:68px">{html.escape(a.hook)}</div>'
+             f'<div id="ctitle" class="cline k it" style="top:1180px;font-size:{CTS}px;line-height:1">{html.escape(a.title)},</div>'
+             f'<div id="cart" class="cline" style="top:{1180 + int(CTS * 0.95)}px;font-size:76px">de {html.escape(a.artist)} ?</div>')
+else:
+    texts = f'<div id="top" class="line top">{chars(a.hook)}</div>\n<div id="title" class="line title">{title}</div>'
 page = f'''<!doctype html>
 <html lang="fr" data-resolution="portrait"><head><meta charset="UTF-8" />
 <meta name="viewport" content="width=1080, height=1920" />
@@ -123,14 +169,14 @@ html,body {{ width:1080px; height:1920px; overflow:hidden; background:#fff; }}
 .line {{ position:absolute; left:0; width:1080px; text-align:center; font-family:"Kaneda"; font-weight:400; }}
 .top {{ top:400px; font-size:68px; }}
 .title {{ top:1170px; font-size:104px; padding:0 60px; }}
+.cline {{ position:absolute; left:120px; font-family:"Kaneda"; font-weight:400; white-space:nowrap; }}
 .k {{ font-weight:900; }} .it {{ font-style:italic; }}
 .w, .ch {{ display:inline-block; }} .w {{ white-space:nowrap; }}
 </style></head><body>
 <div id="root" data-composition-id="main" data-start="0" data-duration="{T}" data-width="1080" data-height="1920">
 <div id="scene" class="clip layer" data-start="0" data-duration="{T}" data-track-index="1">
 <div class="stage"><div id="vin" class="obj"><div class="vinyl"><div class="spin"><div class="disc"></div><div class="label"></div></div><div class="hole"></div><div class="shine"></div></div></div><div id="sleeve" class="obj sleeve"></div></div>
-<div id="top" class="line top">{chars(a.hook)}</div>
-<div id="title" class="line title">{title}</div>
+{texts}
 </div></div>
 <script>
 gsap.registerPlugin(CustomEase);
