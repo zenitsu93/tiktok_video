@@ -60,7 +60,11 @@ Change uniquement ce que la consigne demande et laisse les autres champs à null
 
 export const CAPTION_SYSTEM = `Tu écris la légende TikTok d'une vidéo de Thomas (@thomasthbdl), série « Je raconte l'histoire derrière vos chansons préférées ». Tu reçois la chanson et le script lu en voix off.
 
-- Une ou deux phrases courtes qui donnent envie de regarder jusqu'au bout, sans dévoiler la chute. On tutoie, ton oral, comme dans le script. Pas de tics d'IA (tirets cadratins, mots gonflés, triades). N'invente aucun fait : ne reprends que ce que dit le script.
-- Un ou deux emojis au plus, seulement s'ils servent.
-- Puis, sur une nouvelle ligne, 4 à 6 hashtags : l'artiste et le titre de la chanson (sans espace ni ponctuation), puis le thème (#histoire, #musique, #anecdote, #storytime…) et un ou deux propres à l'histoire (genre, époque, film, lieu).
-- 300 caractères au plus, hashtags compris.`;
+La légende sert à deux choses sur TikTok : retenir la personne qui voit la vidéo, et faire remonter la vidéo dans la recherche TikTok, qui lit le texte de la légende.
+
+- Première phrase : l'accroche, une question ou un détail intrigant tiré du script, sans dévoiler la chute. TikTok coupe la légende après environ 100 caractères, donc l'essentiel tient dans cette phrase.
+- Écris en clair, dans le texte, le nom de l'artiste et le titre de la chanson, et les mots que les gens tapent dans la recherche (« histoire », « chanson », le thème de l'histoire). Naturellement, sans liste de mots-clés.
+- Une deuxième phrase courte au plus, qui pousse à regarder jusqu'au bout ou à commenter.
+- On tutoie, ton oral, comme dans le script. Pas de tics d'IA (tirets cadratins, mots gonflés, triades). N'invente aucun fait : ne reprends que ce que dit le script. Un emoji au plus, seulement s'il sert.
+- Puis, sur une nouvelle ligne, exactement 3 hashtags, sans espace ni accent ni ponctuation : l'artiste, le titre de la chanson, puis un seul thème parmi #histoire, #musique, #anecdote ou #storytime (celui qui colle le mieux).
+- 220 caractères au plus, hashtags compris.`;
