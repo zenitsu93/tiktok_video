@@ -404,6 +404,29 @@ export async function moreImages(videoId: string, beatId: string, instruction?: 
  * « Fond nettoyé » on the image a beat shows: cuts its background out (the checkerboard when
  * there is one, rembg otherwise), keeps the original for « Original », and shows the cut-out.
  */
+/**
+ * An image Thomas uploaded for a beat (when the search found nothing, or the budget ran out):
+ * cleaned like any other (decoded, stripped, resized), put first among the candidates and shown.
+ */
+export async function ownImage(videoId: string, beatId: string, key: string) {
+  await onBeat(videoId, beatId, async () => {
+    try {
+      const asset = await ingestImage(await storage().read(key), "moi");
+      await mutateDoc(db(), videoId, `${beatId} : ma photo`, (d) => ({
+        ...d,
+        assets: { ...d.assets, [asset.id]: asset },
+        beats: d.beats.map((b) =>
+          b.id === beatId
+            ? { ...b, image: asset.id, candidates: [asset.id, ...b.candidates.filter((c) => c !== asset.id)], layout: b.layout === "card" || b.layout === "cutout" ? b.layout : ("card" as const) }
+            : b,
+        ),
+      }));
+    } finally {
+      await storage().remove(key).catch(() => {});
+    }
+  });
+}
+
 export async function cleanImage(videoId: string, beatId: string) {
   await onBeat(videoId, beatId, async () => {
     const { doc } = await load(videoId);

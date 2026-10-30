@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { useState } from "react";
 import type { BeatView, VideoView } from "@/lib/view";
 
-export type Lexicon = { flash: (text: string, err?: boolean) => void; onChange: () => void };
+export type Notify = { flash: (text: string, err?: boolean) => void; onChange: () => void };
 
 const norm = (s: string) => s.toLocaleLowerCase("fr");
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -17,7 +17,7 @@ const countIn = (v: VideoView, word: string) => v.beats.filter((b) => found(b.te
  * how the voice reads it. A word with a rule shows its reading above it. A rule is shared by
  * every video and every occurrence; the lines of this video are voiced again at once.
  */
-export function PronounceWords({ b, v, words, lexicon }: { b: BeatView; v: VideoView; words: string[]; lexicon: Lexicon }) {
+export function PronounceWords({ b, v, words, notify }: { b: BeatView; v: VideoView; words: string[]; notify: Notify }) {
   const [open, setOpen] = useState<{ word: string; say: string; known: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const ruleOf = (w: string) => v.pronunciations.find((p) => norm(p.word) === norm(w));
@@ -36,11 +36,11 @@ export function PronounceWords({ b, v, words, lexicon }: { b: BeatView; v: Video
       if (!r.ok) throw new Error(data.error ?? `Erreur ${r.status}`);
       const n: number = data.revoiced ?? 0;
       const done = method === "POST" ? `« ${payload.word} » se dira « ${payload.say} » partout` : `« ${payload.word} » se lit de nouveau tel quel`;
-      lexicon.flash(n ? `${done} · voix refaite sur ${n} ${n > 1 ? "lignes" : "ligne"}` : done);
+      notify.flash(n ? `${done} · voix refaite sur ${n} ${n > 1 ? "lignes" : "ligne"}` : done);
       setOpen(null);
-      lexicon.onChange();
+      notify.onChange();
     } catch (e) {
-      lexicon.flash(e instanceof Error ? e.message : "Ça n'a pas marché, réessaie.", true);
+      notify.flash(e instanceof Error ? e.message : "Ça n'a pas marché, réessaie.", true);
     } finally {
       setBusy(false);
     }
