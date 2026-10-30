@@ -1,7 +1,7 @@
 import { closeDb, getDb, setError, setProgress, setStatus } from "@regie/db";
 import { BudgetError, env, jobData, JOBS, providers, queue, retryLimit, type JobName } from "@regie/server";
 import { cleanup } from "./cleanup";
-import { caption, generate, moreImages, prerender, render, reviseScript, revoice, rewrite } from "./pipeline";
+import { caption, cleanImage, generate, moreImages, prerender, render, reviseScript, revoice, rewrite } from "./pipeline";
 import { sendToTikTok } from "./tiktok";
 
 /**
@@ -46,6 +46,7 @@ await handle(JOBS.generate, 1, (d: { videoId: string }) => generate(d.videoId), 
 await handle(JOBS.script, 1, (d: { videoId: string; instruction: string }) => reviseScript(d.videoId, d.instruction));
 await handle(JOBS.voice, 3, (d: { videoId: string; beatId: string }) => revoice(d.videoId, d.beatId));
 await handle(JOBS.images, 2, (d: { videoId: string; beatId: string; instruction?: string }) => moreImages(d.videoId, d.beatId, d.instruction));
+await handle(JOBS.clean, 1, (d: { videoId: string; beatId: string }) => cleanImage(d.videoId, d.beatId));
 await handle(JOBS.rewrite, 2, (d: { videoId: string; beatId: string; instruction: string }) => rewrite(d.videoId, d.beatId, d.instruction));
 await handle(JOBS.render, 1, (d: { videoId: string }) => render(d.videoId), true);
 await handle(JOBS.caption, 1, (d: { videoId: string }) => caption(d.videoId));

@@ -141,6 +141,14 @@ describe("edits", () => {
   it("refuses an image that was not fetched for the beat", () => {
     expect(() => applyBeatPatch(doc, "b07", { image: "someone-else" })).toThrow(EditError);
   });
+  it("accepts the cut-out version of one of the beat's images", () => {
+    const b = doc.beats.find((x) => x.candidates.length)!;
+    const c = b.candidates[0]!;
+    const cut = { id: "cut1", kind: "image" as const, mime: "image/png" };
+    const withCut = { ...doc, assets: { ...doc.assets, [c]: { ...doc.assets[c]!, clean: "cut1" }, cut1: cut } };
+    expect(applyBeatPatch(withCut, b.id, { image: "cut1", layout: "cutout" }).doc.beats.find((x) => x.id === b.id)!.image).toBe("cut1");
+    expect(() => applyBeatPatch(doc, b.id, { image: "cut1" })).toThrow(EditError);
+  });
   it("reads @beat references in the command bar", () => {
     expect(parseCommand("@b08 plus sombre", "b02")).toEqual({ beatId: "b08", instruction: "plus sombre" });
     expect(parseCommand("plus sombre", "b02")).toEqual({ beatId: "b02", instruction: "plus sombre" });

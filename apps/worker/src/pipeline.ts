@@ -4,6 +4,7 @@ import { BudgetError, enqueue, env, JOBS, providers, storage, tiktokConfigured, 
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import pLimit from "p-limit";
+import { hasChecker, removeBackground, removeChecker } from "./background";
 import { takeCuts, toBeats } from "./beats";
 import { ff, ingestImage, ingestVoice, sliceTake, storeFile, withTemp } from "./media";
 import { editBeat, splitScript, writeCaption, writeScript } from "./providers/claude";
@@ -109,6 +110,22 @@ export async function remixVoice(videoId: string) {
 
 // ---------------------------------------------------------------- images
 
+/**
+ * Stores a downloaded pin. A pin with a flattened checkerboard is stored with its cut-out
+ * version, which is the one shown; one that cannot be cut cleanly is dropped, so a fake
+ * background never reaches the video.
+ */
+async function ingestPin(buf: Buffer, url: string): Promise<Asset[]> {
+  if (!(await hasChecker(buf))) return [await ingestImage(buf, url)];
+  const cut = await removeChecker(buf);
+  if (!cut) throw new Error("damier impossible à détourer");
+  const clean = await ingestImage(cut, `${url}#sans-fond`);
+  return [{ ...(await ingestImage(buf, url)), checker: true, clean: clean.id }, clean];
+}
+
+/** The version of a candidate that is shown by default: cut out when it came on a checkerboard. */
+const shown = (a: Asset) => (a.checker && a.clean ? a.clean : a.id);
+
 /** Words added to a search for « Autres images », one more per click. */
 const VARIANTS = ["vintage", "aesthetic", "photo", "close up", "black and white", "editorial", "film still", "candid"];
 
@@ -127,6 +144,8 @@ export async function imagesFor(videoId: string, beatIds: string[], opts: { quer
   const known = new Set(Object.values(doc.assets).map((a) => a.source));
   const want = opts.want ?? 6;
   const added: Asset[] = [];
+  // cut-out versions of the added images: stored with them, never candidates themselves
+  const cutouts: Asset[] = [];
 
   if (query.kind === "cover") {
     const url = await deezerCover(doc.title, doc.artist);
@@ -139,7 +158,9 @@ export async function imagesFor(videoId: string, beatIds: string[], opts: { quer
       for (const url of [...new Set(urls)].filter((u) => !known.has(u))) {
         if (added.length >= want) break;
         try {
-          added.push(await ingestImage(await fetchImage(url), url));
+          const [image, clean] = await ingestPin(await fetchImage(url), url);
+          added.push(image!);
+          if (clean) cutouts.push(clean);
         } catch (e) {
           console.warn("[images] skipped", url, (e as Error).message);
         }
@@ -154,16 +175,14 @@ export async function imagesFor(videoId: string, beatIds: string[], opts: { quer
   if (!added.length) return 0;
   await mutateDoc(db(), videoId, `images ${beatIds.join(",")}`, (d) => ({
     ...d,
-    assets: { ...d.assets, ...Object.fromEntries(added.map((a) => [a.id, a])) },
+    assets: { ...d.assets, ...Object.fromEntries([...added, ...cutouts].map((a) => [a.id, a])) },
     beats: d.beats.map((b) => {
       if (!beatIds.includes(b.id)) return b;
       const candidates = [...added.map((a) => a.id), ...b.candidates.filter((c) => !added.some((a) => a.id === c))].slice(0, 24);
-      return {
-        ...b,
-        imageQuery: query,
-        candidates,
-        image: opts.select || !b.image ? added[0]!.id : b.image,
-      };
+      const image = opts.select || !b.image ? shown(added[0]!) : b.image;
+      // a cut-out is posed on the white, not framed in a card
+      const cut = image !== b.image && image !== added[0]!.id;
+      return { ...b, imageQuery: query, candidates, image, layout: cut && b.layout === "card" ? "cutout" : b.layout };
     }),
   }));
   return added.length;
@@ -378,6 +397,32 @@ export async function moreImages(videoId: string, beatId: string, instruction?: 
     }
     // the button must not look dead: say so, and how to get something else
     if (!added) await setError(db(), videoId, `Pas de nouvelle image pour ${beatId}. Décris ce que tu veux dans la barre : « @${beatId} une photo de … »`);
+  });
+}
+
+/**
+ * « Fond nettoyé » on the image a beat shows: cuts its background out (the checkerboard when
+ * there is one, rembg otherwise), keeps the original for « Original », and shows the cut-out.
+ */
+export async function cleanImage(videoId: string, beatId: string) {
+  await onBeat(videoId, beatId, async () => {
+    const { doc } = await load(videoId);
+    const beat = doc.beats.find((b) => b.id === beatId);
+    const original = beat?.candidates.find((c) => c === beat.image || doc.assets[c]?.clean === beat.image);
+    if (!beat || !original) throw new Error(`Le plan ${beatId} n'a pas d'image à détourer.`);
+    let cleanId = doc.assets[original]?.clean;
+    let clean: Asset | undefined;
+    if (!cleanId) {
+      const row = await getAsset(db(), original);
+      if (!row) throw new Error("Image introuvable.");
+      clean = await ingestImage(await removeBackground(await storage().read(row.storageKey)), `${doc.assets[original]?.source ?? original}#sans-fond`);
+      cleanId = clean.id;
+    }
+    await mutateDoc(db(), videoId, `${beatId} : fond nettoyé`, (d) => ({
+      ...d,
+      assets: clean ? { ...d.assets, [clean.id]: clean, [original]: { ...d.assets[original]!, clean: clean.id } } : d.assets,
+      beats: d.beats.map((b) => (b.id === beatId ? { ...b, image: cleanId!, layout: b.layout === "card" ? ("cutout" as const) : b.layout } : b)),
+    }));
   });
 }
 
