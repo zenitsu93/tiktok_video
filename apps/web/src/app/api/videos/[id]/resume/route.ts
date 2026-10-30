@@ -1,4 +1,5 @@
-import { getDb, getVideo, setStatus } from "@regie/db";
+import { voiceStale } from "@regie/core";
+import { getDb, getVideo, pronunciationLexicon, setStatus } from "@regie/db";
 import { enqueue, JOBS } from "@regie/server";
 import { NextResponse } from "next/server";
 import { HttpError, route, videoId } from "@/lib/http";
@@ -16,7 +17,8 @@ export const POST = route(async (_req, { params }: Ctx) => {
   if (!row) throw new HttpError(404, "Vidéo introuvable.");
   if (row.status !== "error") throw new HttpError(409, "Cette vidéo n'est pas en erreur.");
   const { beats } = row.doc;
-  const unfinished = !beats.length || beats.some((b) => !b.voice || b.voiceText !== b.text || !b.candidates.length);
+  const lexicon = await pronunciationLexicon(db);
+  const unfinished = !beats.length || beats.some((b) => voiceStale(b, lexicon) || !b.candidates.length);
   if (unfinished) {
     await setStatus(db, id, "generating", { step: "Reprise", done: 0, total: 1 });
     await enqueue(JOBS.generate, { videoId: id });

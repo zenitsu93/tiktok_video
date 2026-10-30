@@ -8,6 +8,7 @@ import type { BeatView, VideoView } from "@/lib/view";
 import { Caption } from "./caption";
 import { DeleteVideo } from "./delete-video";
 import { Lecture } from "./lecture";
+import { Pronunciations } from "./pronunciations";
 import { TikTokSend, tiktokMoving } from "./tiktok-send";
 import { StatusChip } from "./status";
 import { chime, Fan, Grooves, LineBusy, Platine, Sleeve, stageOf } from "./waits";
@@ -499,6 +500,14 @@ export function Fil({ initial }: { initial: VideoView }) {
           </div>
         </div>
         <Caption v={v} write={() => run(() => call(`${url}/caption`, "POST").then(refresh), "Claude écrit la légende")} />
+        <Pronunciations
+          v={v}
+          flash={flash}
+          onChange={() => {
+            setEager(Date.now() + 15_000);
+            void refresh();
+          }}
+        />
         <Costs v={v} />
       </aside>
 

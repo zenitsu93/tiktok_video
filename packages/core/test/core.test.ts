@@ -8,8 +8,10 @@ import {
   parseCommand,
   previewDocument,
   sceneDocument,
+  spokenText,
   textRuns,
   timeBeats,
+  voiceStale,
   type ComposeContext,
   type VideoDoc,
 } from "../src";
@@ -142,5 +144,20 @@ describe("edits", () => {
   it("reads @beat references in the command bar", () => {
     expect(parseCommand("@b08 plus sombre", "b02")).toEqual({ beatId: "b08", instruction: "plus sombre" });
     expect(parseCommand("plus sombre", "b02")).toEqual({ beatId: "b02", instruction: "plus sombre" });
+  });
+});
+
+describe("pronunciation", () => {
+  const lexicon = { Sade: "Chadé", "Sade Adu": "Chadé Adou", Beyoncé: "Bi-yon-cé" };
+  it("says the lexicon words, whole words only, whatever the case", () => {
+    expect(spokenText("Like a Tattoo de Sade.", lexicon)).toBe("Like a Tattoo de Chadé.");
+    expect(spokenText("SADE chante, Sadeness non.", lexicon)).toBe("Chadé chante, Sadeness non.");
+    expect(spokenText("Sade Adu et Beyoncé", lexicon)).toBe("Chadé Adou et Bi-yon-cé");
+  });
+  it("marks the voice stale when the lexicon changes how a line is read", () => {
+    const beat = { ...demoDoc().beats[0]!, text: "de Sade", voice: "v1", voiceText: "de Sade" };
+    expect(voiceStale(beat)).toBe(false);
+    expect(voiceStale(beat, lexicon)).toBe(true);
+    expect(voiceStale({ ...beat, voiceText: "de Chadé" }, lexicon)).toBe(false);
   });
 });

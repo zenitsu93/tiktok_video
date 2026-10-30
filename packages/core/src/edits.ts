@@ -28,9 +28,23 @@ export function applyBeatPatch(doc: VideoDoc, beatId: string, patch: BeatPatch):
   return { doc: { ...doc, beats }, voiceChanged: before.text !== next.text };
 }
 
-/** True when the voice clip was made from another text than the one shown. */
-export function voiceStale(beat: Beat): boolean {
-  return beat.voice === null || beat.voiceText !== beat.text;
+/**
+ * The sentence as the voice must read it: each word of the pronunciation lexicon
+ * (whole word, any case) becomes how to say it. The screen keeps the sentence as written.
+ */
+export function spokenText(text: string, lexicon: Record<string, string>): string {
+  let out = text;
+  // longest first, so « Sade Adu » wins over « Sade »
+  for (const word of Object.keys(lexicon).sort((a, b) => b.length - a.length)) {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "giu"), () => lexicon[word]!);
+  }
+  return out;
+}
+
+/** True when the voice clip was made from another text than the one the voice should read now. */
+export function voiceStale(beat: Beat, lexicon: Record<string, string> = {}): boolean {
+  return beat.voice === null || beat.voiceText !== spokenText(beat.text, lexicon);
 }
 
 /**
