@@ -1,6 +1,6 @@
-import type { Asset, VideoDoc } from "@regie/core";
+import type { VideoDoc } from "@regie/core";
 import { sql } from "drizzle-orm";
-import { bigint, boolean, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigint, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 /** review: the script waits to be read; listen: the voice waits to be heard; ready: shots to check, then the montage. */
 export type VideoStatus = "draft" | "review" | "generating" | "listen" | "ready" | "rendering" | "error";
@@ -127,29 +127,12 @@ export const pronunciations = pgTable("pronunciations", {
 });
 
 /**
- * Thomas's image library: each picture he kept on a shot or brought himself, offered again to
- * the next videos before any paid search. It lives apart from the videos: deleting a video
- * leaves its kept pictures here (their files stay while a row names them).
+ * Pinterest searches already paid for, by their exact words (lowercase, single spaces).
+ * The same search again takes these pins instead of paying Apify a second time.
  */
-export const library = pgTable(
-  "library",
-  {
-    /** The picture as it was found (the original, even when the shot showed it cut out). */
-    assetId: text("asset_id").primaryKey(),
-    /** Its idea's searches and big word, normalized: what an automatic match compares. */
-    words: text("words").notNull(),
-    /** The line it was shown on, for a search in French. */
-    text: text("text").notNull(),
-    /** What the picture shows, in a few words, under its thumbnail. */
-    label: text("label").notNull(),
-    /** Every file it needs in a video: the picture, its cut-out, a clip's first frame. */
-    files: jsonb("files").$type<Asset[]>().notNull(),
-    /** The shot showed it cut out: it comes back cut out. */
-    cut: boolean("cut").notNull().default(false),
-    /** The videos it went into. */
-    videos: jsonb("videos").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    usedAt: timestamp("used_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [index("library_used_idx").on(t.usedAt)],
-);
+export const pinSearches = pgTable("pin_searches", {
+  query: text("query").primaryKey(),
+  /** The best image address of each pin returned, in Pinterest's order. */
+  urls: jsonb("urls").$type<string[]>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

@@ -11,7 +11,6 @@ import { editBeat, splitScript, writeCaption, writeScript } from "./providers/cl
 import { demoCaption, demoImages, demoScript, demoSplit, demoVoice } from "./providers/demo";
 import { speak, speakTake } from "./providers/elevenlabs";
 import { deezerCover, fetchImage, searchPinterest } from "./providers/images";
-import { keepShots } from "./library";
 import { exportVideo, prerenderScenes } from "./render";
 
 const db = () => getDb();
@@ -159,7 +158,7 @@ export async function imagesFor(videoId: string, beatIds: string[], opts: { quer
       // most ideas fill up on their first search, and every pin returned is billed
       for (const q of query.queries) {
         if (new Set(urls.filter((u) => !known.has(u))).size >= want) break;
-        urls.push(...(await searchPinterest(videoId, q + variant, want)));
+        urls.push(...(await searchPinterest(videoId, q + variant, want, known)));
       }
       for (const url of [...new Set(urls)].filter((u) => !known.has(u))) {
         if (added.length >= want) break;
@@ -188,8 +187,7 @@ export async function imagesFor(videoId: string, beatIds: string[], opts: { quer
       const image = opts.select || !b.image ? shown(added[0]!) : b.image;
       // a cut-out is posed on the white, not framed in a card
       const cut = image !== b.image && image !== added[0]!.id;
-      const clip = d.assets[image]?.kind === "video" || added.some((a) => a.id === image && a.kind === "video");
-      return { ...b, imageQuery: query, candidates, image, layout: clip ? "card" : cut && b.layout === "card" ? "cutout" : b.layout };
+      return { ...b, imageQuery: query, candidates, image, layout: cut && b.layout === "card" ? "cutout" : b.layout };
     }),
   }));
   return added.length;
@@ -505,8 +503,6 @@ export async function render(videoId: string) {
   const res = await exportVideo(videoId, doc, (done, total) => setProgress(db(), videoId, { step: "Montage des plans", done, total }));
   await setRendered(db(), videoId, res.asset.id, res.hashes);
   await setStatus(db(), videoId, "ready");
-  // the pictures it went out with join the library, for the next videos
-  await keepShots(videoId).catch((e) => console.warn("[bibliothèque]", (e as Error).message));
   console.log(`[render] ${videoId}: ${res.rendered}/${res.total} scènes rendues, le reste venait du cache`);
   // the export is done either way: a send that cannot start shows on its line, or the button stays
   await autoSend(videoId, res.asset.id).catch((e) => console.warn("[tiktok] envoi automatique :", (e as Error).message));

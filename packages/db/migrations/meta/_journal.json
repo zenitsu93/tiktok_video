@@ -36,6 +36,20 @@
       "when": 1793386498663,
       "tag": "0004_library",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793397332275,
+      "tag": "0005_drop_library",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793397332862,
+      "tag": "0006_pin_searches",
+      "breakpoints": true
     }
   ]
 }
