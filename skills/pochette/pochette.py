@@ -172,6 +172,8 @@ html,body {{ width:1080px; height:1920px; overflow:hidden; background:#fff; }}
 .cline {{ position:absolute; left:120px; font-family:"Kaneda"; font-weight:400; white-space:nowrap; }}
 .k {{ font-weight:900; }} .it {{ font-style:italic; }}
 .w, .ch {{ display:inline-block; }} .w {{ white-space:nowrap; }}
+/* texte stable : chaque élément que GSAP déplace est rendu dans son propre calque, sinon Chrome arrondit sa position au pixel et le texte tremble */
+.stage, .obj, .line, .cline {{ will-change:transform; }}
 </style></head><body>
 <div id="root" data-composition-id="main" data-start="0" data-duration="{T}" data-width="1080" data-height="1920">
 <div id="scene" class="clip layer" data-start="0" data-duration="{T}" data-track-index="1">

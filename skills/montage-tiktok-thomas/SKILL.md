@@ -23,7 +23,7 @@ Les valeurs ci-dessous ont été mesurées image par image sur 25 vidéos de ré
 - Projet : `npx hyperframes init <dossier>`, racine en **1080×1920, 30 i/s**, `data-duration` = durée exacte de la voix off (ffprobe).
 - **Fond blanc pur `#FFFFFF`** sur toute la vidéo. Jamais de dégradé, de texture ni de fond coloré. Le blanc est le personnage principal du style : entre deux idées l'écran redevient blanc.
 - Une seule « scène » visuelle à la fois : une carte image + une ligne de texte au-dessus, en dessous ou à côté. Par défaut le bloc est centré horizontalement, centre optique vers y ≈ 790 px (41 % de la hauteur), dans la bande 300–1350 px (zone sûre TikTok). Environ un écran sur trois sort du centre (voir « Placement libre » plus bas).
-- Rien sous la ligne y = 1350 sauf la fin d'un bloc de texte.
+- Rien sous la ligne y = 1350 sauf la fin d'un bloc de texte ou un texte posé en bas à gauche (« Placement libre »), qui ne descend jamais sous y = 1500. Seules exceptions : le plein écran et le grand détourage qui déborde (voir Variations).
 
 ## La carte image (élément central)
 
@@ -39,10 +39,11 @@ Les valeurs ci-dessous ont été mesurées image par image sur 25 vidéos de ré
 - **Kaneda Gothic** partout (condensée). Le contraste vient du **mélange de graisses et de tailles dans la même ligne** :
   - Ex. « mais au » (Light) au-dessus de « faite » (Black) ; « une **grosse** production » ; « en **1993** » ; « **45** minutes ».
 - Chaque groupe a **un seul mot héros**. Choisis-le comme le ferait un monteur : le mot qui porte l'émotion ou l'info (chiffre, nom propre, adjectif fort).
-- **Trois graisses, toujours les mêmes rôles** (cohérence d'une vidéo à l'autre, ne jamais improviser une autre graisse) :
+- **Quatre graisses, toujours les mêmes rôles** (cohérence d'une vidéo à l'autre, ne jamais improviser une autre graisse) :
   - **Light 300, ≈ 80 px** : les mots de liaison autour d'un mot héros ;
   - **Bold 700, ≈ 78 px** : une phrase sans mot héros (« avec de », « Au contraire », « il s'isole ») ;
-  - **Black 900, ≈ 190 px** : le mot héros, un seul par groupe.
+  - **Black 900, ≈ 190 px** : le mot héros, un seul par groupe ;
+  - **Regular 400, ≈ 62–68 px** : les lignes « parlées » et le texte courant des variations (voir plus bas), où le mot clé passe en Black à la même taille ou en Regular plus grand.
 - **Alignement des mots** :
   - si le mot héros est précédé de **1 ou 2 mots** (« touche **autant** », « **45** minutes », « C'est la **cicatrice** »), ils sont sur **la même ligne, alignés sur la ligne de base** du mot héros (flex `align-items: baseline`, écart ≈ 22 px), jamais centrés verticalement ;
   - au-delà, les mots de liaison passent sur la ligne au-dessus et la suite sur la ligne en dessous ;
@@ -106,7 +107,7 @@ N'utilise jamais `linear` ni `power1` pour un mouvement visible (seule exception
 **Bloc cinétique** pour une phrase longue sans image (≥ 8 mots, ex. « et cette idée : il y a des souvenirs qu'on ne peut pas effacer. ») : découpe-la en 3 à 5 lignes de sens, chaque ligne mise à la **même largeur** (≈ 820 px, la taille de police varie donc d'une ligne à l'autre ; mesure la largeur avec le vrai fichier de police), graisses alternées Light / Bold et la ligne du mot héros en Black. Chaque ligne arrive du bas (`y: 140, scale: 0.7, opacity: 0 → 1`, 0.4 s, `smooth`) quand elle est dite ; le bloc entier se recentre et se réduit à chaque nouvelle ligne (les lignes se poussent et prennent la place les unes des autres) jusqu'à former un bloc justifié harmonieux.
 
 **Variations de mise en page et de texte** (relevées image par image sur la vidéo « The Lady in My Life » de la personne) :
-- **Placement libre** : environ un écran sur trois, le bloc quitte le centre et se cale dans un coin ou sur un bord (haut droite aligné à droite, bas gauche aligné à gauche, haut gauche) ; l'écran suivant change de zone. Le texte seul, sans image, est souvent posé ainsi, petit (≈ 62 px), avec beaucoup de blanc autour. Tout reste dans la zone sûre (x 90–990, y 300–1600).
+- **Placement libre** : environ un écran sur trois, le bloc quitte le centre et se cale dans un coin ou sur un bord (haut droite aligné à droite, bas gauche aligné à gauche, haut gauche) ; l'écran suivant change de zone. Le texte seul, sans image, est souvent posé ainsi, petit (≈ 62 px), avec beaucoup de blanc autour. Tout reste dans la zone sûre (x 90–990, y 300–1500).
 - **Emphase par la taille seule** : dans une ligne Regular, le mot clé reste en Regular mais passe à ≈ 1.45× la taille (« quand **Quincy Jones** lui », « dans les **dernières** minutes ») ; à utiliser pour les noms propres, en alternance avec l'emphase par la graisse.
 - **Gras en ligne, même taille** : une phrase Regular ≈ 62 px où le mot clé passe en Black 900 sans changer de taille (« pour l'album **Thriller** », « Michael était tellement **mal à l'aise** », « **coupée** avant la sortie »). C'est la forme la plus fréquente sur les textes longs ; garde le mot héros géant (190 px) pour les mots courts et forts.
 - **Le texte descend sur la carte** : la ligne au-dessus d'une carte naît plus haut, plus grosse, floue et grise (`y: −90, scale: 1.15, blur 8 px, #BBB`) et se pose en noir (0.7 s, `smooth`). Elle peut aussi naître sous la carte et monter (`y: +60`), floue et grise.
@@ -117,11 +118,24 @@ N'utilise jamais `linear` ni `power1` pour un mouvement visible (seule exception
 - **Vinyle comme carte** : au milieu de l'histoire, quand on parle d'une version ou d'un disque, un vinyle (étiquette = photo de l'artiste ou pochette) remplace la carte, tourne lentement et porte le texte dessous.
 - **Carte portrait haute** : pour une illustration ou un portrait, carte 9:16 étroite (≈ 400 px de large) plutôt que carrée.
 
+**Variations relevées sur « ghostin » et « Dangerous »** (à doser comme les précédentes, au plus une ou deux par vidéo chacune) :
+- **Petit + grand, même graisse** : sur une ligne, les mots de liaison en Regular ≈ 62 px et le groupe clé en Regular ≈ 110–120 px, alignés sur la ligne de base (« et pourtant **chaque soir** », « c'est **une autre personne** / qui occupe **tes pensées** », aligné à droite). Pas de gras : seule la taille parle.
+- **Bloc mixte aligné à droite** : 3 à 5 lignes courtes au-dessus de la carte, alignées à droite, Regular avec 1 ou 2 mots par ligne en Black un peu plus grand (×1.35) : « Tu es **amoureux** / d'une version de cette / **personne** que tu as / **créée** dans ta **tête** ». Les lettres se tapent d'un trait.
+- **Fondu dans la carte** : deux ou trois images se succèdent dans la même carte par fondu enchaîné (0.6 s, `sine.inOut`) pendant que le texte reste ; la carte ne bouge pas.
+- **Triptyque** : une seule carte large (≈ 860×420) coupée en trois photos séparées par un trait blanc de 8 px ; les trois montent du bas l'une après l'autre (`y: 440 → 0`, 0.5 s, `smooth`, décalage 0.09 s). Pour comparer ou énumérer des personnes (« Pete Davidson ou **Mac Miller** »).
+- **Note vocale avec paroles bilingues** : quand l'histoire cite un message vocal ou une interview audio, une carte photo au-dessus d'une bulle de lecture grise arrondie (icône pause, ondes de 30 barres qui passent du gris au noir au rythme de l'audio, compte à rebours), crédit dessous (« **Nom** (Voice Note) – « Titre » »). Au-dessus de la carte, la phrase originale en Black ≈ 54 px et sa traduction juste dessous en Regular **violet clair `#8C74C6`** (seule couleur autorisée hors palette de l'image, contraste ≥ 3:1) ; les deux lignes changent ensemble à chaque phrase (montée de 14 px, 0.25 s).
+- **Apparition floue** : un détourage (silhouette, fantôme, souvenir) naît dans le flou (`blur 30 → 0, scale 1.08 → 1, opacity 0 → 1`, 0.9 s, `smooth`) quand on parle de quelque chose d'irréel ; il sort en étant tranché en diagonale (`clip-path` qui remonte en biais, 0.3 s, `inquick`), puis le texte suivant arrive seul.
+- **Plein écran** : une seule fois par vidéo, au moment le plus fort (sortie de l'album, date clé), coupe sèche vers une image qui remplit tout l'écran sans carte ni coins, zoom arrière lent `1.12 → 1` ; le titre s'y tape en Black ≈ 190 px dans une couleur prélevée dans l'image (« **DANGEROUS** » en rouge), puis « en octobre **1990** » en blanc. Retour au blanc par coupe sèche.
+- **Le geste illustre le mot, « tombé »** : l'objet détouré se soulève à peine (`y −30, rotation −3°`, 0.25 s) puis bascule et tombe hors du cadre (`y +520, x +180, rotation 24°, opacity 0`, 0.5 s, `inquick`, pivot en bas à droite) exactement sur le mot.
+- **Grand détourage qui déborde** : quand un nouveau personnage entre dans l'histoire, son portrait détouré, très grand (≈ 800 px de large), monte du bas et reste coupé par le bord bas et le bord gauche de l'écran ; la carte de la scène continue au-dessus à droite, et son nom s'écrit en Black ≈ 78 px à côté de lui. Il peut rester plusieurs écrans pendant que les cartes au-dessus changent.
+- **Texte au gris, la carte grandit** : à la fin d'un groupe, le texte au-dessus de la carte passe au gris (0.15 s) et s'efface, et la carte portrait grandit (`scale 1 → 1.3`, origine en haut, 0.4 s, `smooth`) pour prendre la place libérée avant le groupe suivant.
+- **Fin « le vinyle tombe »** (variante de l'outro, quand la boucle de couverture n'est pas voulue) : le vinyle tombe d'en haut à droite et se pose au centre en tournant (0.55 s, `smooth`), le titre apparaît en gris clair puis fonce au noir (Regular ≈ 120 px), l'artiste dessous en Light Italic (jamais une police script).
+
 Règles de rythme :
 - Un nouvel élément (texte, carte ou changement de carte) **toutes les 1 à 2 s**. Une image reste rarement plus de 4 s, sauf une vidéo qui joue.
 - Les entrées d'images tombent **sur le mot** auquel elles correspondent dans la voix, pas avant.
 - Varie les gestes : fais tourner les entrées dans l'ordre pop → depuis la droite → montée → zoom vers l'intérieur → depuis la gauche → descente → grossir-reposer → glissé, jamais le même geste deux fois de suite.
-- Une carte posée ne se déplace plus, sauf pour faire de la place ; seule l'image à l'intérieur zoome doucement.
+- Une carte posée ne se déplace plus, sauf pour faire de la place ou pour un geste listé ici (réduction en vignette, la carte grandit, le geste illustre le mot) ; sinon seule l'image à l'intérieur zoome doucement.
 
 ## Structure d'un épisode
 
@@ -154,6 +168,8 @@ Rien n'est figé sur une chanson : seuls la pochette, le titre et l'artiste chan
 - Chaque élément animé est enveloppé : la `.clip` gère l'apparition (`data-start`/`data-duration`), un enfant `.inner` reçoit `scale`/`x`/`y`. Jamais d'animation de `display`/`visibility` sur la `.clip`.
 - Les textes, couleurs d'accent et sources d'images sont des variables (`data-var-text`, `data-var-src`, `var(--accent)`) pour que la personne puisse les modifier dans l'app HyperFrames.
 - Une seule timeline en pause par composition, enregistrée dans `window.__timelines`. Tout temps est calculé depuis les horodatages de la transcription, jamais à la main au jugé.
+- **Texte stable (anti-tremblement)** : tout élément que GSAP déplace ou redimensionne (bloc de texte, ligne, partie de ligne, `.inner` de carte, vinyle, détourage, `<img>` qui zoome) porte `will-change: transform` dans le CSS. Sans ça, Chrome arrondit la position du texte au pixel entier à chaque image : un texte qui glisse de 24 px en 0.4 s avance par sauts de 0 puis 1 px (mesuré : écart de 0.81 px d'une image à l'autre, contre 0.11 px avec `will-change`) et paraît trembler, surtout sur les mouvements lents (« Reposer du texte », dérive du vinyle de couverture, bloc cinétique qui se réduit). Jamais sur chaque lettre `.ch` (des centaines de calques pour rien : les lettres ne bougent pas, elles changent de couleur). La netteté finale est identique (mesurée).
+- Évite aussi les causes voisines de flottement : pas de `top`/`left`/`width` animés (seulement `x`, `y`, `scale`, `rotation`), pas de `scale` sur un parent ET sur l'enfant au même moment, et un seul tween à la fois par propriété sur un même élément.
 - Charge `CustomEase.min.js` après `gsap.min.js` (les deux dans `assets/`, même version, copiés depuis le dossier `vendor/npm/gsap@*/dist` de HyperFrames si le CDN est bloqué).
 
 Exemple d'un écran « carte + mot héros » :
@@ -175,7 +191,7 @@ tl.fromTo(c, { scale: 0 }, { scale: 1.06, duration: 0.3, ease: "back.out(1.6)" }
 tl.fromTo("#c3 img", { scale: 1 }, { scale: 1.12, duration: 1.70, ease: "sine.inOut" }, 9.80);
 // lettres tapées : chaque <span class="ch"> calé sur l'horodatage du mot
 tl.fromTo("#c3 .ch", { opacity: 0, color: "#C8C8C8" },
-  { opacity: 1, color: "inherit", duration: 0.06, stagger: 0.045 }, 10.30);
+  { opacity: 1, color: "#111", duration: 0.06, stagger: 0.045 }, 10.30); // couleur finale réelle (#111 ou l'accent), jamais "inherit"
 // le texte bouge : liaison du côté de l'image, héros par le bas
 tl.fromTo("#c3 .light", { y: 180, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, ease: "smooth" }, 10.30);
 tl.fromTo("#c3 .hero", { scale: 1.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.45, ease: "smooth" }, 10.55);
@@ -202,6 +218,8 @@ CSS de base :
 .flow  { font-family:"Kaneda"; font-weight:400; font-size:68px; text-align:center; }
 .flow .k { font-weight:900; }
 .w     { display:inline-block; white-space:nowrap; }
+/* texte stable : calque propre pour tout ce qui bouge */
+.inner, .stack, .line, .row > span, .card img { will-change:transform; }
 ```
 
 ## Plusieurs versions d'une même vidéo
