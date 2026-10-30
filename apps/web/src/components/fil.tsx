@@ -63,6 +63,33 @@ function Divider({ width, onResize }: { width: number; onResize: (w: number) => 
 const tc = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 const usd = (n: number) => `${n.toFixed(n < 1 ? 3 : 2)} $`;
 
+/**
+ * The montages tried on this video: « ↻ Remonter autrement » draws a new one (same words, voice and images),
+ * a pill puts an earlier one back. Style 1 is the montage the video had first.
+ */
+function Styles({ v, again, pick }: { v: VideoView; again: () => void; pick: (style: number) => void }) {
+  const drawing = v.busy.includes("restyle");
+  const locked = drawing || v.status === "generating" || v.status === "rendering";
+  return (
+    <div className="styles" role="group" aria-label="Styles de montage">
+      <span className="lbl">Montage</span>
+      {Array.from({ length: v.styles }, (_, i) => (
+        <button key={i} className={`chip${i === v.styleIndex ? " on" : ""}`} onClick={() => pick(i)} disabled={locked || i === v.styleIndex} aria-pressed={i === v.styleIndex}>
+          Style {i + 1}
+        </button>
+      ))}
+      {drawing && (
+        <span className="chip draft">
+          <Loader2 size={13} className="spin" /> Style {Math.max(2, v.styles + 1)}
+        </span>
+      )}
+      <button className="btn sm" onClick={again} disabled={locked} title="Mêmes mots, même voix, mêmes images : entrées, places du texte, zooms et sorties retirés au sort">
+        <RotateCcw size={14} /> Remonter autrement
+      </button>
+    </div>
+  );
+}
+
 async function call(url: string, method: string, payload?: unknown) {
   const r = await fetch(url, {
     method,
@@ -427,6 +454,13 @@ export function Fil({ initial }: { initial: VideoView }) {
             />
             <DeleteVideo id={v.id} />
           </div>
+          {v.beats.length > 0 && !firstRun && (
+            <Styles
+              v={v}
+              again={() => run(() => call(`${url}/restyle`, "POST"), "La Régie remonte la vidéo autrement")}
+              pick={(style) => run(() => call(`${url}/restyle`, "POST", { style }), `Retour au style ${style + 1}`)}
+            />
+          )}
           {firstRun ? (
             <Platine
               stage={stageOf(v.progress?.step, v.status === "rendering")}

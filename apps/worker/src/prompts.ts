@@ -28,6 +28,16 @@ Retire les tics d'écriture d'IA : triades forcées, tirets cadratins, phrases q
 ## Ce que tu rends
 Le script final seul, prêt à être lu, puis une ligne « SOURCES: » suivie des URL des sources, une par ligne. Rien d'autre.`;
 
+/** The gestures and the mood, read from the lines: at the split, and again for a video made before them. */
+const MOVE_RULES = `- move : le geste qui raconte la phrase, lu dans son sens. "none" par défaut. Un geste est un événement : 3 à 6 par vidéo, au moins 4 passages entre deux, jamais le même deux fois de suite, et varie-les d'une vidéo à l'autre.
+  - "fall" : l'image tombe hors du cadre sur le mot héros. Pour une chute, une perte, un échec (« tombe », « s'effondre », « perd »). Sur "card" ou "cutout", dernier passage de son image.
+  - "shatter" : la carte vole en éclats sur le mot héros. Pour une rupture, un choc, un cœur brisé (« se briser », « exploser », « détruire »). Sur "card", dernier passage de son image.
+  - "mystery" : l'image se floute sous le texte. Pour un secret, quelque chose de caché, d'oublié ou de peu connu. Sur "card".
+  - "fullscreen" : l'image remplit tout l'écran, une seule fois par vidéo, au moment le plus fort (la sortie de l'album, la date clé, la révélation). Sur "card", passage court avec un mot héros fort.
+  - "evaporate" : la carte pâlit et s'efface dans le blanc. Fin de chapitre douce, souvenir qui s'éloigne, quelqu'un qui disparaît. Sur "card", dernier passage de son image.
+  - "ghost" : le détourage naît dans le flou. Pour un fantôme, un souvenir, quelque chose d'irréel. Sur "cutout".
+- mood : "sombre" si l'histoire est sombre ou mélancolique (deuil, solitude, maladie, mort), alors toutes les images passent en noir et blanc ; "lumineux" sinon. "sombre" reste rare.`;
+
 export const SPLIT_SYSTEM = `Tu découpes un script de voix off TikTok en passages pour le montage de Thomas (@thomasthbdl).
 
 Règles :
@@ -47,14 +57,7 @@ Règles :
   - Pas plus de 4 passages "card" d'affilée : casse la série avec un "cutout", un "text" ou un "kinetic".
   - Varie la nature des images : photos réelles des personnes et des lieux (époque exacte), peinture ou illustration pour une idée abstraite (émotion, voix, solitude), dessin au trait pour un objet, et un mème de réaction pour un moment d'ironie si le script en a un.
 - imageQuery : pour "card" et "cutout", kind "pinterest" avec 2 recherches Pinterest en anglais, précises (nom + année + scène + aesthetic / painting / line art / png / reaction meme selon le rendu voulu). Les passages qui gardent la même image ont exactement les mêmes recherches. Quand le passage nomme l'album ou la pochette, kind "cover" sans recherche. Sinon kind "none" sans recherche.
-- move : le geste qui raconte la phrase, lu dans son sens. "none" par défaut. Un geste est un événement : 3 à 6 par vidéo, au moins 4 passages entre deux, jamais le même deux fois de suite, et varie-les d'une vidéo à l'autre.
-  - "fall" : l'image tombe hors du cadre sur le mot héros. Pour une chute, une perte, un échec (« tombe », « s'effondre », « perd »). Sur "card" ou "cutout", dernier passage de son image.
-  - "shatter" : la carte vole en éclats sur le mot héros. Pour une rupture, un choc, un cœur brisé (« se briser », « exploser », « détruire »). Sur "card", dernier passage de son image.
-  - "mystery" : l'image se floute sous le texte. Pour un secret, quelque chose de caché, d'oublié ou de peu connu. Sur "card".
-  - "fullscreen" : l'image remplit tout l'écran, une seule fois par vidéo, au moment le plus fort (la sortie de l'album, la date clé, la révélation). Sur "card", passage court avec un mot héros fort.
-  - "evaporate" : la carte pâlit et s'efface dans le blanc. Fin de chapitre douce, souvenir qui s'éloigne, quelqu'un qui disparaît. Sur "card", dernier passage de son image.
-  - "ghost" : le détourage naît dans le flou. Pour un fantôme, un souvenir, quelque chose d'irréel. Sur "cutout".
-- mood : "sombre" si l'histoire est sombre ou mélancolique (deuil, solitude, maladie, mort), alors toutes les images passent en noir et blanc ; "lumineux" sinon. "sombre" reste rare.`;
+${MOVE_RULES}`;
 
 export const EDIT_SYSTEM = `Tu corriges un seul passage d'une vidéo TikTok de Thomas (@thomasthbdl), à la demande de Thomas. Tu reçois le passage, ses voisins et la consigne.
 
@@ -76,3 +79,9 @@ La légende sert à deux choses sur TikTok : retenir la personne qui voit la vid
 - On tutoie, ton oral, comme dans le script. Pas de tics d'IA (tirets cadratins, mots gonflés, triades). N'invente aucun fait : ne reprends que ce que dit le script. Un emoji au plus, seulement s'il sert.
 - Puis, sur une nouvelle ligne, exactement 3 hashtags, sans espace ni accent ni ponctuation : l'artiste, le titre de la chanson, puis un seul thème parmi #histoire, #musique, #anecdote ou #storytime (celui qui colle le mieux).
 - 220 caractères au plus, hashtags compris.`;
+
+
+export const MOVES_SYSTEM = `Tu relis les passages d'une vidéo TikTok de Thomas (@thomasthbdl), déjà découpée et montée, pour choisir les gestes de montage qui racontent les phrases. Tu reçois chaque passage avec son id, sa mise en page ("card", "cutout", "text", "kinetic", "vinyl", "mascot") et son mot héros. Un passage suivi de « (même image) » garde l'image du précédent.
+
+Rends pour chaque passage son id et son move, et le mood de la vidéo :
+${MOVE_RULES}`;

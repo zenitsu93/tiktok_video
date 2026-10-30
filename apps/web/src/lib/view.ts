@@ -51,7 +51,10 @@ export interface VideoView {
   voice: string | null;
   /** How the voice says some words, for every video (the screen keeps the spelling). */
   pronunciations: { word: string; say: string }[];
-  /** Beat ids a job is working on, and "caption" while the caption is being written. */
+  /** How many montages were tried (« Remonter autrement »), and the one on screen. */
+  styles: number;
+  styleIndex: number | null;
+  /** Beat ids a job is working on, "caption" while the caption is being written, "restyle" while a new montage is drawn. */
   busy: string[];
   dirty: string[];
   download: string | null;
@@ -132,6 +135,8 @@ export async function videoView(row: VideoRow): Promise<VideoView> {
     caption: doc.caption ?? null,
     voice: doc.voiceTrack ? signMedia(doc.voiceTrack, 6 * 3600) : null,
     pronunciations,
+    styles: doc.styles?.length ?? 0,
+    styleIndex: doc.styleIndex ?? null,
     busy: row.busyBeats,
     dirty: row.renderAsset && doc.beats.length ? dirtyBeats(doc, row.renderedScenes) : [],
     download: row.renderAsset ? `${signMedia(row.renderAsset, 6 * 3600)}&dl=${slug(`${row.artist}-${row.title}`)}` : null,

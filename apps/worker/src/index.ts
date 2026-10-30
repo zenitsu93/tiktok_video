@@ -1,7 +1,7 @@
 import { closeDb, getDb, setError, setProgress, setStatus } from "@regie/db";
 import { BudgetError, env, jobData, JOBS, providers, queue, retryLimit, type JobName } from "@regie/server";
 import { cleanup } from "./cleanup";
-import { caption, cleanImage, generate, ownImage, moreImages, prerender, render, reviseScript, revoice, rewrite } from "./pipeline";
+import { caption, cleanImage, generate, ownImage, moreImages, prerender, render, restyle, reviseScript, revoice, rewrite } from "./pipeline";
 import { sendToTikTok } from "./tiktok";
 
 /**
@@ -51,6 +51,7 @@ await handle(JOBS.clean, 1, (d: { videoId: string; beatId: string }) => cleanIma
 await handle(JOBS.rewrite, 2, (d: { videoId: string; beatId: string; instruction: string }) => rewrite(d.videoId, d.beatId, d.instruction));
 await handle(JOBS.render, 1, (d: { videoId: string }) => render(d.videoId), true);
 await handle(JOBS.caption, 1, (d: { videoId: string }) => caption(d.videoId));
+await handle(JOBS.restyle, 1, (d: { videoId: string }) => restyle(d.videoId));
 
 // the send records its own outcome on its line; it never marks the video as failed
 await boss.work(JOBS.tiktok, { localConcurrency: 1 }, async ([job]) => {

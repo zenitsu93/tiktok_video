@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyBeatPatch,
+  applyStyle,
   buildScenes,
   coverTitleSize,
   demoDoc,
@@ -8,6 +9,7 @@ import {
   parseCommand,
   previewDocument,
   sceneDocument,
+  snapshotStyle,
   spokenText,
   textRuns,
   timeBeats,
@@ -221,5 +223,26 @@ describe("gestures", () => {
     const { rows } = textRuns({ ...demoDoc().beats[5]!, text: "et pourtant chaque soir", hero: "chaque soir", place: "size", italic: false }, false);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.map((r) => r.cls)).toEqual(["small", "big"]);
+  });
+});
+
+describe("styles", () => {
+  it("puts an earlier montage back exactly, look included", () => {
+    const doc = withImages(demoDoc());
+    const first = { ...doc, look: { seed: 3, mono: false } };
+    const style = snapshotStyle(first);
+    const second: VideoDoc = {
+      ...first,
+      look: { seed: 9, mono: true, zoom: "push" },
+      beats: first.beats.map((b) => ({ ...b, entrance: "drop" as const, place: "topright" as const })),
+      styles: [style],
+      styleIndex: 1,
+    };
+    const back = applyStyle(second, 0);
+    expect(back.look).toEqual(first.look);
+    expect(back.styleIndex).toBe(0);
+    expect(back.beats.map((b) => [b.entrance, b.place ?? null])).toEqual(first.beats.map((b) => [b.entrance, b.place ?? null]));
+    expect(back.beats.map((b) => b.text)).toEqual(first.beats.map((b) => b.text));
+    expect(() => applyStyle(second, 4)).toThrow("Ce style n'existe pas.");
   });
 });

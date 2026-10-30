@@ -341,6 +341,16 @@ body.resizing iframe { pointer-events: none; }
 label.btn.off { opacity: 0.5; pointer-events: none; }
 button.chip { cursor: pointer; border: 0; font-family: inherit; }
 
+/* « Remonter autrement »: one pill per montage tried */
+.styles { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.styles .lbl { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--mute); margin-right: 4px; }
+.styles button.chip { border: 1px solid var(--line); }
+.styles button.chip:hover:not(:disabled) { border-color: var(--ink); }
+.styles button.chip:disabled { cursor: default; }
+.styles .chip.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.styles .chip.draft { border-style: dashed; color: var(--mute); }
+.styles .btn { margin-left: 4px; }
+
 /* La Planche: « je cherche moi-même », one tile per idea */
 .seg-views { display: inline-flex; align-self: flex-start; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
 .seg-views button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 5px 14px; font-size: 14px; font-weight: 400; cursor: pointer; }
