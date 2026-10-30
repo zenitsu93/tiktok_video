@@ -5,6 +5,7 @@ import * as schema from "./schema";
 export * from "./schema";
 export * from "./videos";
 export * from "./tiktok";
+export * from "./pronunciations";
 export { schema };
 
 export type Db = PostgresJsDatabase<typeof schema>;

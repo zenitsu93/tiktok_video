@@ -1,5 +1,5 @@
 import { timeBeats, voiceStale, type Beat, type Layout, type Entrance } from "@regie/core";
-import { getDb, lastTikTokSend, videoCosts, type TikTokSendStatus, type VideoRow } from "@regie/db";
+import { getDb, lastTikTokSend, listPronunciations, videoCosts, type TikTokSendStatus, type VideoRow } from "@regie/db";
 import { dirtyBeats, providers, signMedia, tiktokConfigured, tiktokConnected } from "@regie/server";
 
 /** What the browser gets for one video: the script, timings, signed image links, costs. No secrets, no storage keys. */
@@ -39,6 +39,8 @@ export interface VideoView {
   draft: string | null;
   /** The TikTok caption with its hashtags, to paste in TikTok. */
   caption: string | null;
+  /** How the voice says some words, for every video (the screen keeps the spelling). */
+  pronunciations: { word: string; say: string }[];
   /** Beat ids a job is working on, and "caption" while the caption is being written. */
   busy: string[];
   dirty: string[];
@@ -77,6 +79,8 @@ export async function videoView(row: VideoRow): Promise<VideoView> {
     if (a?.kind === "image") images[id] = { url: signMedia(id, 6 * 3600), accent: a.accent ?? null, w: a.width, h: a.height };
   }
   const send = await lastTikTokSend(getDb(), row.id);
+  const pronunciations = await listPronunciations(getDb());
+  const lexicon = Object.fromEntries(pronunciations.map((p) => [p.word, p.say]));
   const configured = tiktokConfigured();
   const costs = (await videoCosts(getDb(), row.id)).map((c) => ({ ...c, cost: Number(c.cost) }));
   return {
@@ -103,7 +107,7 @@ export async function videoView(row: VideoRow): Promise<VideoView> {
       gap: b.gap,
       start: b.start,
       end: b.end,
-      voiceStale: voiceStale(b),
+      voiceStale: voiceStale(b, lexicon),
       queries: b.imageQuery.queries,
     })),
     images,
@@ -111,6 +115,7 @@ export async function videoView(row: VideoRow): Promise<VideoView> {
     sources: doc.sources,
     draft: doc.beats.length ? null : (doc.draft ?? null),
     caption: doc.caption ?? null,
+    pronunciations,
     busy: row.busyBeats,
     dirty: row.renderAsset && doc.beats.length ? dirtyBeats(doc, row.renderedScenes) : [],
     download: row.renderAsset ? `${signMedia(row.renderAsset, 6 * 3600)}&dl=${slug(`${row.artist}-${row.title}`)}` : null,

@@ -112,3 +112,13 @@ export const tiktokSends = pgTable(
   },
   (t) => [index("tiktok_sends_video_idx").on(t.videoId, t.createdAt)],
 );
+
+/**
+ * How the voice says a word, for every video (Sade → Chadé): the screen keeps the real
+ * spelling, only the text sent to the voice changes. One line per word, whatever its case.
+ */
+export const pronunciations = pgTable("pronunciations", {
+  word: text("word").primaryKey(),
+  say: text("say").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

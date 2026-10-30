@@ -1,5 +1,5 @@
 import { getDb, recordUsage } from "@regie/db";
-import { assertBudget, env, PRICES } from "@regie/server";
+import { assertBudget, BudgetError, env, PRICES } from "@regie/server";
 
 /**
  * Image downloads only go to these hosts, over HTTPS, with a size cap.
@@ -79,7 +79,14 @@ export async function searchPinterest(videoId: string, query: string, limit: num
       signal: AbortSignal.timeout(150_000),
     },
   );
-  if (!res.ok) throw new Error(`Apify a répondu ${res.status} : ${(await res.text()).slice(0, 300)}`);
+  if (!res.ok) {
+    const detail = (await res.text()).slice(0, 300);
+    // the account's monthly spending cap: nothing will pass until it is raised or the month turns
+    if (/usage hard limit|platform-feature-disabled/i.test(detail)) {
+      throw new BudgetError("Ton compte Apify a atteint sa limite de dépense du mois. Relève-la sur console.apify.com (Billing, Limits), puis clique sur « Reprendre ».");
+    }
+    throw new Error(`Apify a répondu ${res.status} : ${detail}`);
+  }
   const items = (await res.json()) as unknown[];
   await recordUsage(getDb(), {
     videoId,

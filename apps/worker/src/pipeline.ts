@@ -1,6 +1,6 @@
-import { applyBeatPatch, beatContext, FPS, timeBeats, type Asset, type Beat, type VideoDoc } from "@regie/core";
-import { createTikTokSend, getAsset, getDb, getVideo, lastTikTokSend, mutateDoc, setBusy, setError, setProgress, setRendered, setStatus, tiktokSendInFlight } from "@regie/db";
-import { enqueue, env, JOBS, providers, storage, tiktokConfigured, tiktokConnected } from "@regie/server";
+import { applyBeatPatch, beatContext, FPS, spokenText, timeBeats, voiceStale, type Asset, type Beat, type VideoDoc } from "@regie/core";
+import { createTikTokSend, getAsset, getDb, getVideo, lastTikTokSend, mutateDoc, pronunciationLexicon, setBusy, setError, setProgress, setRendered, setStatus, tiktokSendInFlight } from "@regie/db";
+import { BudgetError, enqueue, env, JOBS, providers, storage, tiktokConfigured, tiktokConnected } from "@regie/server";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import pLimit from "p-limit";
@@ -38,15 +38,18 @@ export async function voiceBeat(videoId: string, beatId: string, remix = true) {
   const beat = doc.beats[i];
   if (!beat) return;
   const text = beat.text;
+  // the voice reads the words of the pronunciation lexicon as they are said, the screen as they are written
+  const lexicon = await pronunciationLexicon(db());
+  const said = (t: string | undefined) => (t === undefined ? undefined : spokenText(t, lexicon));
   const audio = providers().voice
-    ? await speak(videoId, text, { previous: doc.beats[i - 1]?.text, next: doc.beats[i + 1]?.text })
-    : await demoVoice(text);
+    ? await speak(videoId, said(text)!, { previous: said(doc.beats[i - 1]?.text), next: said(doc.beats[i + 1]?.text) })
+    : await demoVoice(said(text)!);
   const asset = await ingestVoice(audio, providers().voice ? "elevenlabs" : "démo", providers().voice);
   await mutateDoc(db(), videoId, `voix ${beatId}`, (d) => ({
     ...d,
     assets: { ...d.assets, [asset.id]: asset },
     // if the sentence changed again meanwhile, its own job will voice it
-    beats: d.beats.map((b) => (b.id === beatId && b.text === text ? { ...b, voice: asset.id, voiceText: text } : b)),
+    beats: d.beats.map((b) => (b.id === beatId && b.text === text ? { ...b, voice: asset.id, voiceText: said(text)! } : b)),
   }));
   if (remix) await remixVoice(videoId);
 }
@@ -58,8 +61,11 @@ export async function voiceBeat(videoId: string, beatId: string, remix = true) {
 async function voiceTake(videoId: string) {
   const { doc } = await load(videoId);
   const texts = doc.beats.map((b) => b.text);
-  const take = await speakTake(videoId, texts.join(" "));
-  const cuts = takeCuts(texts, take.starts, take.ends, take.ends.at(-1)! + 0.5);
+  const lexicon = await pronunciationLexicon(db());
+  const said = texts.map((t) => spokenText(t, lexicon));
+  const take = await speakTake(videoId, said.join(" "));
+  // the letter timings follow what was read, so the cuts are found in the read text
+  const cuts = takeCuts(said, take.starts, take.ends, take.ends.at(-1)! + 0.5);
   const clips = await sliceTake(take.audio, cuts, "elevenlabs");
   const ids = doc.beats.map((b) => b.id);
   await mutateDoc(db(), videoId, "voix", (d) => ({
@@ -68,7 +74,7 @@ async function voiceTake(videoId: string) {
     // the pauses are already in the take, so the beats sit end to end
     beats: d.beats.map((b) => {
       const k = ids.indexOf(b.id);
-      return k >= 0 && b.text === texts[k] ? { ...b, voice: clips[k]!.id, voiceText: b.text, gap: 0 } : b;
+      return k >= 0 && b.text === texts[k] ? { ...b, voice: clips[k]!.id, voiceText: said[k]!, gap: 0 } : b;
     }),
   }));
 }
@@ -214,7 +220,8 @@ export async function generate(videoId: string) {
     beats = (await load(videoId)).doc.beats;
   }
   // then, three sentences at a time, only the lines that do not have theirs yet
-  const toVoice = beats.filter((b) => !b.voice || b.voiceText !== b.text);
+  const lexicon = await pronunciationLexicon(db());
+  const toVoice = beats.filter((b) => voiceStale(b, lexicon));
   const voiceLimit = pLimit(3);
   let voiced = beats.length - toVoice.length;
   await setProgress(db(), videoId, { step: "Voix off", done: voiced, total: beats.length });
@@ -242,18 +249,32 @@ export async function generate(videoId: string) {
   const todo = groups.filter((g) => !g.every((id) => done.has(id)));
   const imageLimit = pLimit(2);
   let found = groups.length - todo.length;
+  const failed: { beats: string[]; error: Error }[] = [];
   await Promise.all(
     todo.map((g) =>
       imageLimit(async () => {
-        try {
-          await imagesFor(videoId, g);
-        } catch (e) {
-          console.warn("[images]", g.join(","), (e as Error).message);
+        // a budget wall (ours or Apify's) stops every search after it: no use knocking again
+        if (!failed.some((f) => f.error instanceof BudgetError)) {
+          try {
+            await imagesFor(videoId, g);
+          } catch (e) {
+            console.warn("[images]", g.join(","), (e as Error).message);
+            failed.push({ beats: g, error: e as Error });
+          }
         }
         await setProgress(db(), videoId, { step: "Images", done: ++found, total: groups.length });
       }),
     ),
   );
+  // a video without its images must not go out as a wall of text: stop before the export,
+  // and « Reprendre » fetches only the missing ones
+  if (failed.length) {
+    const found = new Set((await load(videoId)).doc.beats.filter((b) => b.candidates.length).map((b) => b.id));
+    const missing = todo.filter((g) => !g.some((id) => found.has(id)));
+    const first = failed.find((f) => f.error instanceof BudgetError) ?? failed[0]!;
+    const message = `Pas d'images pour ${missing.length} ${missing.length > 1 ? "idées" : "idée"}, à partir de ${missing[0]?.[0] ?? first.beats[0]}. ${first.error.message}`;
+    throw first.error instanceof BudgetError ? new BudgetError(message) : new Error(message);
+  }
   if (!(await load(videoId)).doc.cover) await coverFor(videoId);
   // a caption that fails does not hold the video back: the « Écrire la légende » button retries it
   if (!(await load(videoId)).doc.caption) await caption(videoId).catch((e) => console.warn("[légende]", (e as Error).message));

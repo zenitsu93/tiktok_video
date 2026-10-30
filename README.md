@@ -18,11 +18,13 @@ Ensuite je relis. Le script s'affiche phrase par phrase, et chaque phrase est un
 4. Apify va chercher des images sur Pinterest, Deezer donne la pochette.
 5. HyperFrames monte chaque plan en 1080×1920, en Kaneda Gothic, fond blanc. La vidéo s'ouvre et se ferme sur la « Pochette » : le vinyle sort de la pochette de la chanson, avec le titre et l'artiste. ffmpeg colle les plans et pose la voix.
 
-Si la connexion lâche pendant une génération, la tâche réessaie toute seule. Si elle finit quand même en erreur, le bouton « Reprendre » repart de là où elle s'était arrêtée.
+Si la connexion lâche pendant une génération, la tâche réessaie toute seule. Si elle finit quand même en erreur, le bouton « Reprendre » repart de là où elle s'était arrêtée. Une vidéo à qui il manque des images (Apify qui refuse, plafond atteint) s'arrête avant le montage, avec la raison : elle ne part jamais comme un mur de texte. « Reprendre » ne va chercher que les images manquantes.
 
 Kaneda Gothic est dans le dépôt (`brand/fonts/kaneda/`, voir son README). Ce n'est pas une police libre : garde le dépôt privé. L'app, elle, reste en Oswald.
 
 Corriger un plan ne relance pas tout. Changer une image, un effet ou le mot en grand ne coûte rien : aucun appel à un modèle. Changer le texte refait la voix de cette phrase seulement. Une consigne à Claude (« @b08 une photo plus vieille ») n'envoie que la phrase et ses deux voisines, pas tout le script.
+
+Un nom mal prononcé se règle dans « Prononciation », sous l'aperçu : « Sade » → « Chadé ». L'écran garde « Sade », la voix dit « Chadé », dans toutes les vidéos. Dans la vidéo ouverte, les lignes déjà enregistrées qui contiennent le mot sont refaites tout de suite.
 
 ## Les écrans
 
