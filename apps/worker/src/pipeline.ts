@@ -305,19 +305,22 @@ export async function generate(videoId: string) {
   );
   // a video without its images must not go out as a wall of text: stop before the export,
   // and « Reprendre » fetches only the missing ones
+  let notice: string | null = null;
   if (failed.length) {
     const found = new Set((await load(videoId)).doc.beats.filter((b) => b.candidates.length).map((b) => b.id));
     const missing = todo.filter((g) => !g.some((id) => found.has(id)));
     const first = failed.find((f) => f.error instanceof BudgetError) ?? failed[0]!;
     const message = `Pas d'images pour ${missing.length} ${missing.length > 1 ? "idées" : "idée"}, à partir de ${missing[0]?.[0] ?? first.beats[0]}. ${first.error.message}`;
-    throw first.error instanceof BudgetError ? new BudgetError(message) : new Error(message);
+    if (!(first.error instanceof BudgetError)) throw new Error(message);
+    // over budget the video is not stuck: Thomas puts his own pictures on those lines (free), then mounts it
+    notice = `${message} Mets tes propres images avec « Ma photo » dans ces plans, puis « Monter la vidéo ».`;
   }
   if (!(await load(videoId)).doc.cover) await coverFor(videoId);
   // a caption that fails does not hold the video back: the « Écrire la légende » button retries it
   if (!(await load(videoId)).doc.caption) await caption(videoId).catch((e) => console.warn("[légende]", (e as Error).message));
   // the montage waits for Thomas too: he checks the shots, then « Monter la vidéo » (which then goes to TikTok);
   // meanwhile the scenes are made ahead, so that click has little left to do
-  await setStatus(db(), videoId, "ready");
+  await setStatus(db(), videoId, "ready", null, notice);
   await enqueue(JOBS.prerender, { videoId });
 }
 
@@ -466,12 +469,21 @@ export async function render(videoId: string) {
   // so the export never carries the old reading
   const lexicon = await pronunciationLexicon(db());
   const stale = row.doc.beats.filter((b) => voiceStale(b, lexicon));
+  let revoiced = 0;
   for (const [k, b] of stale.entries()) {
     await setProgress(db(), videoId, { step: "Voix à refaire", done: k, total: stale.length });
-    await voiceBeat(videoId, b.id, false);
+    try {
+      await voiceBeat(videoId, b.id, false);
+      revoiced++;
+    } catch (e) {
+      // over budget, the line keeps its last voice: a video with an old reading beats no video
+      if (!(e instanceof BudgetError)) throw e;
+      console.warn(`[render] ${videoId} ${b.id} : voix gardée, ${e.message}`);
+      break;
+    }
   }
-  if (stale.length) await remixVoice(videoId);
-  const doc = stale.length ? (await load(videoId)).doc : row.doc;
+  if (revoiced) await remixVoice(videoId);
+  const doc = revoiced ? (await load(videoId)).doc : row.doc;
   const res = await exportVideo(videoId, doc, (done, total) => setProgress(db(), videoId, { step: "Montage des plans", done, total }));
   await setRendered(db(), videoId, res.asset.id, res.hashes);
   await setStatus(db(), videoId, "ready");

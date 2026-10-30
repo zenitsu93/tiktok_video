@@ -498,7 +498,8 @@ export function Fil({ initial }: { initial: VideoView }) {
           )}
           {v.error && (
             <div className="chips" style={{ alignItems: "center" }}>
-              <p className="chip hot" role="alert" style={{ whiteSpace: "normal", margin: 0 }}>
+              {/* at « ready » it is a notice (budget reached: own pictures to add), not a failure */}
+              <p className={`chip ${v.status === "error" ? "hot" : "warn"}`} role="alert" style={{ whiteSpace: "normal", margin: 0 }}>
                 {v.error}
               </p>
               {v.status === "error" && (
