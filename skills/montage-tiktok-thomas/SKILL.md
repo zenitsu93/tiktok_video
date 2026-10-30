@@ -21,7 +21,7 @@ Les valeurs ci-dessous ont été mesurées image par image sur 25 vidéos de ré
 ## Format et grille
 
 - Projet : `npx hyperframes init <dossier>`, racine en **1080×1920, 30 i/s**, `data-duration` = durée exacte de la voix off (ffprobe).
-- **Fond blanc pur `#FFFFFF`** sur toute la vidéo. Jamais de dégradé, de texture ni de fond coloré. Le blanc est le personnage principal du style : entre deux idées l'écran redevient blanc.
+- **Fond blanc pur `#FFFFFF`** sur toute la vidéo. Jamais de dégradé, de texture ni de fond coloré. Seules exceptions : le plein écran (une fois par vidéo) et le flash gris très clair de 3 images (voir Variations). Le blanc est le personnage principal du style : entre deux idées l'écran redevient blanc.
 - Une seule « scène » visuelle à la fois : une carte image + une ligne de texte au-dessus, en dessous ou à côté. Par défaut le bloc est centré horizontalement, centre optique vers y ≈ 790 px (41 % de la hauteur), dans la bande 300–1350 px (zone sûre TikTok). Environ un écran sur trois sort du centre (voir « Placement libre » plus bas).
 - Rien sous la ligne y = 1350 sauf la fin d'un bloc de texte ou un texte posé en bas à gauche (« Placement libre »), qui ne descend jamais sous y = 1500. Seules exceptions : le plein écran et le grand détourage qui déborde (voir Variations).
 
