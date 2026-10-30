@@ -386,13 +386,14 @@ export function Fil({ initial }: { initial: VideoView }) {
                 <a className="btn primary sm" href={v.download} download>
                   <Download size={15} /> Télécharger MP4
                 </a>
-                {/* nothing changed, but the export itself can improve (voice level…): the shots come from the cache, only the mix is redone */}
+                {/* nothing changed, but the export can improve (voice level…): the shots come from the cache, only the mix is
+                    redone, and the new export goes to TikTok by itself (autoSend) */}
                 <button
                   className="btn ghost sm"
                   disabled={!canRender}
-                  onClick={() => run(() => call(`${url}/render`, "POST"), "Export relancé avec les derniers réglages")}
-                  title="Refaire l'export avec les derniers réglages (niveau de la voix…). Les plans ne sont pas re-rendus."
-                  aria-label="Refaire l'export"
+                  onClick={() => run(() => call(`${url}/render`, "POST"), v.tiktok.connected ? "Export relancé : il repartira sur TikTok tout seul" : "Export relancé avec les derniers réglages")}
+                  title={v.tiktok.connected ? "Refaire l'export avec les derniers réglages (niveau de la voix…) et le renvoyer sur TikTok" : "Refaire l'export avec les derniers réglages (niveau de la voix…)"}
+                  aria-label={v.tiktok.connected ? "Refaire et renvoyer sur TikTok" : "Refaire l'export"}
                 >
                   <RotateCcw size={15} />
                 </button>
