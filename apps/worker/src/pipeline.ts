@@ -320,12 +320,12 @@ export async function generate(videoId: string) {
     const message = `Pas d'images pour ${missing.length} ${missing.length > 1 ? "idées" : "idée"}, à partir de ${missing[0]?.[0] ?? first.beats[0]}. ${first.error.message}`;
     if (!(first.error instanceof BudgetError)) throw new Error(message);
     // over budget the video is not stuck: Thomas puts his own pictures on those lines (free), then mounts it
-    notice = `${message} Mets tes propres images avec « Ma photo » dans ces plans, puis « Monter la vidéo ».`;
+    notice = `${message} Mets tes propres images avec « Ma photo » dans ces plans, puis « Envoyer sur TikTok ».`;
   }
   if (!(await load(videoId)).doc.cover) await coverFor(videoId);
   // a caption that fails does not hold the video back: the « Écrire la légende » button retries it
   if (!(await load(videoId)).doc.caption) await caption(videoId).catch((e) => console.warn("[légende]", (e as Error).message));
-  // the montage waits for Thomas too: he checks the shots, then « Monter la vidéo » (which then goes to TikTok);
+  // the montage waits for Thomas too: he checks the shots, then « Envoyer sur TikTok » (which makes the file, then sends it);
   // meanwhile the scenes are made ahead, so that click has little left to do
   await setStatus(db(), videoId, "ready", null, notice);
   // by hand, the scenes are made ahead as the pictures come in (each « Ma photo » starts it)
