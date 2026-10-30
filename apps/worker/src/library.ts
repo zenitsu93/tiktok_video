@@ -1,5 +1,5 @@
-import { keywords, libraryForIdea, normalizeWords, type Asset, type VideoDoc } from "@regie/core";
-import { exportedVideoIds, getDb, getVideo, keepInLibrary, listLibrary, type Keep, type LibraryRow } from "@regie/db";
+import { normalizeWords, type Asset, type VideoDoc } from "@regie/core";
+import { exportedVideoIds, getDb, getVideo, keepInLibrary, listLibrary, type Keep } from "@regie/db";
 
 /**
  * What each picture shot of a video keeps in the library: the picture as found (with its cut-out,
@@ -39,11 +39,4 @@ export async function fillLibrary() {
   const ids = await exportedVideoIds(getDb());
   for (const id of ids) await keepShots(id);
   if (ids.length) console.log(`[bibliothèque] images de ${ids.length} vidéos déjà montées rangées`);
-}
-
-/** Library pictures that fit an idea and are not in the video yet. */
-export async function fromLibrary(doc: VideoDoc, queries: string[], want: number): Promise<LibraryRow[]> {
-  if (!keywords(queries.join(" ")).length) return [];
-  const items = (await listLibrary(getDb())).filter((r) => !doc.assets[r.assetId]);
-  return libraryForIdea(items, queries, want);
 }

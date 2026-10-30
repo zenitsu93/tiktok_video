@@ -1,4 +1,4 @@
-import { applyBeatPatch, beatContext, FPS, libraryAssets, libraryShown, spokenText, timeBeats, voiceStale, type Asset, type Beat, type VideoDoc } from "@regie/core";
+import { applyBeatPatch, beatContext, FPS, spokenText, timeBeats, voiceStale, type Asset, type Beat, type VideoDoc } from "@regie/core";
 import { createTikTokSend, getAsset, getDb, getVideo, lastTikTokSend, mutateDoc, pronunciationLexicon, setBusy, setError, setProgress, setRendered, setStatus, tiktokSendInFlight } from "@regie/db";
 import { BudgetError, enqueue, env, JOBS, providers, storage, tiktokConfigured, tiktokConnected } from "@regie/server";
 import { readFile } from "node:fs/promises";
@@ -11,7 +11,7 @@ import { editBeat, splitScript, writeCaption, writeScript } from "./providers/cl
 import { demoCaption, demoImages, demoScript, demoSplit, demoVoice } from "./providers/demo";
 import { speak, speakTake } from "./providers/elevenlabs";
 import { deezerCover, fetchImage, searchPinterest } from "./providers/images";
-import { fromLibrary, keepShots } from "./library";
+import { keepShots } from "./library";
 import { exportVideo, prerenderScenes } from "./render";
 
 const db = () => getDb();
@@ -147,26 +147,12 @@ export async function imagesFor(videoId: string, beatIds: string[], opts: { quer
   const added: Asset[] = [];
   // cut-out versions of the added images: stored with them, never candidates themselves
   const cutouts: Asset[] = [];
-  // library pictures, and the version their shot showed (cut out or not)
-  const fromShelf = new Map<string, string>();
-  const show = (a: Asset) => fromShelf.get(a.id) ?? shown(a);
 
   if (query.kind === "cover") {
     const url = await deezerCover(doc.title, doc.artist);
     if (url && !known.has(url)) added.push(await ingestImage(await fetchImage(url), url));
   } else if (query.kind === "pinterest") {
-    // the library first: a picture kept on an earlier video costs nothing. Two that fit and the
-    // paid search is skipped; « Autres images » and a described search always go to Pinterest
-    const kept = opts.fresh || opts.queries?.length ? [] : await fromLibrary(doc, query.queries, want);
-    for (const p of kept) {
-      const files = libraryAssets(p);
-      added.push(files[p.assetId]!);
-      cutouts.push(...Object.values(files).filter((f) => f.id !== p.assetId));
-      fromShelf.set(p.assetId, libraryShown(p));
-      known.add(files[p.assetId]!.source);
-    }
-    if (kept.length >= 2) console.log(`[bibliothèque] ${first.id} : ${kept.length} images reprises, pas de recherche Pinterest`);
-    else if (providers().images) {
+    if (providers().images) {
       const urls: string[] = [];
       const variant = opts.fresh ? ` ${VARIANTS[Math.floor(first.candidates.length / want) % VARIANTS.length]}` : "";
       // the next search of the idea only when the ones before did not bring enough new pins:
@@ -199,7 +185,7 @@ export async function imagesFor(videoId: string, beatIds: string[], opts: { quer
     beats: d.beats.map((b) => {
       if (!beatIds.includes(b.id)) return b;
       const candidates = [...added.map((a) => a.id), ...b.candidates.filter((c) => !added.some((a) => a.id === c))].slice(0, 24);
-      const image = opts.select || !b.image ? show(added[0]!) : b.image;
+      const image = opts.select || !b.image ? shown(added[0]!) : b.image;
       // a cut-out is posed on the white, not framed in a card
       const cut = image !== b.image && image !== added[0]!.id;
       const clip = d.assets[image]?.kind === "video" || added.some((a) => a.id === image && a.kind === "video");
