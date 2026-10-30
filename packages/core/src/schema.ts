@@ -112,6 +112,8 @@ export const videoDocSchema = z.object({
   scriptOk: z.boolean().optional(),
   /** Thomas listened to the voice and approved it: only then are images searched (they cost). */
   voiceOk: z.boolean().optional(),
+  /** « Je cherche moi-même » : no paid image search, Thomas brings each idea's picture from Pinterest (La Planche). */
+  manualImages: z.boolean().optional(),
   /** The TikTok caption with its hashtags. The send to TikTok carries no text: Thomas pastes it there. */
   caption: z.string().max(2200).optional(),
 });

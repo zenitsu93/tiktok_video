@@ -1,13 +1,14 @@
 "use client";
 
 import { ENTRANCE_LABELS, ENTRANCES, LAYOUT_LABELS, LAYOUTS, type BeatPatch } from "@regie/core";
-import { ArrowLeft, Download, Image as ImageIcon, ImagePlus, Loader2, Maximize2, Mic, Minimize2, Pause, Play, RotateCcw, Scissors, Send, Sparkles, Undo2, Wand2 } from "lucide-react";
+import { ArrowLeft, Download, Hand, Image as ImageIcon, ImagePlus, LayoutGrid, List, Loader2, Maximize2, Mic, Minimize2, Pause, Play, RotateCcw, Scissors, Send, Sparkles, Undo2, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BeatView, VideoView } from "@/lib/view";
 import { Caption } from "./caption";
 import { DeleteVideo } from "./delete-video";
 import { Lecture } from "./lecture";
+import { Planche } from "./planche";
 import { PronounceWords, type Notify } from "./pronunciations";
 import { TikTokSend, tiktokMoving } from "./tiktok-send";
 import { StatusChip } from "./status";
@@ -351,6 +352,9 @@ export function Fil({ initial }: { initial: VideoView }) {
   // lines that need a picture and have none (the search failed, or the budget ran out)
   const missing = v.beats.filter((b) => !b.image && (b.layout === "card" || b.layout === "cutout"));
   const upToDate = Boolean(v.download) && v.dirty.length === 0 && !voiceMissing;
+  // « je cherche moi-même » : La Planche until the first export, Le Fil a click away
+  const [board, setBoard] = useState<boolean | null>(null);
+  const planche = v.manualImages && v.status !== "listen" && v.beats.length > 0 && (board ?? !v.download);
 
   // the script waits to be read and approved before anything paid is spent
   const rewriting = v.status === "generating" && /réécriture/i.test(v.progress?.step ?? "");
@@ -382,7 +386,7 @@ export function Fil({ initial }: { initial: VideoView }) {
           <div className="meta">
             <StatusChip status={v.status}>{v.total > 0 && <span className="mono">{tc(v.total)}</span>}</StatusChip>
             {v.angle && <span className="chip">angle : {v.angle}</span>}
-            {missing.length > 0 && (
+            {missing.length > 0 && !planche && (
               <button
                 className="chip warn"
                 onClick={() => {
@@ -477,18 +481,40 @@ export function Fil({ initial }: { initial: VideoView }) {
                 Lance l&apos;aperçu (▶). Un mot mal dit : « Prononciation », sous l&apos;aperçu. Une phrase à changer : clique dessus. Les images ne sont cherchées
                 qu&apos;après ta validation.
               </span>
-              <button
-                className="btn primary sm"
-                style={{ alignSelf: "flex-start" }}
-                disabled={v.busy.length > 0 || voiceMissing}
-                title={v.busy.length > 0 || voiceMissing ? "Une ligne attend encore sa voix" : undefined}
-                onClick={() => run(() => call(`${url}/voice`, "POST").then(refresh), "Voix validée : recherche des images")}
-              >
-                <Mic size={15} /> Valider la voix
-              </button>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <button
+                  className="btn primary sm"
+                  disabled={v.busy.length > 0 || voiceMissing}
+                  title={v.busy.length > 0 || voiceMissing ? "Une ligne attend encore sa voix" : "Pinterest via Apify, environ 1 $ par vidéo"}
+                  onClick={() => run(() => call(`${url}/voice`, "POST", {}).then(refresh), "Voix validée : recherche des images")}
+                >
+                  <Mic size={15} /> Valider · la Régie cherche
+                </button>
+                <button
+                  className="btn dark sm"
+                  disabled={v.busy.length > 0 || voiceMissing}
+                  title={
+                    v.busy.length > 0 || voiceMissing
+                      ? "Une ligne attend encore sa voix"
+                      : "Aucune recherche payante : tu prends les images sur Pinterest (la pochette et la légende sont faites quand même)"
+                  }
+                  onClick={() => {
+                    setBoard(true);
+                    void run(() => call(`${url}/voice`, "POST", { manual: true }).then(refresh), "Voix validée : à toi les images");
+                  }}
+                >
+                  <Hand size={15} /> Valider · je cherche moi-même
+                </button>
+              </div>
             </div>
           )}
-          {v.status === "ready" && !v.download && (
+          {v.status === "ready" && !v.download && v.manualImages && (
+            <div className="panel step" role="status">
+              <b>Étape 3 : trouve tes images</b>
+              <span className="mute">Une case par idée. Quand chaque case a son image, « Monter la vidéo » : à la fin du montage, elle part sur TikTok.</span>
+            </div>
+          )}
+          {v.status === "ready" && !v.download && !v.manualImages && (
             <div className="panel step" role="status">
               <b>Étape 3 : vérifie les images</b>
               <span className="mute">
@@ -521,22 +547,37 @@ export function Fil({ initial }: { initial: VideoView }) {
           </p>
         )}
 
-        <div className="beats">
-          {v.beats.map((b) => (
-            <BeatRow
-              key={b.id}
-              b={b}
-              v={v}
-              selected={sel === b.id}
-              current={nowBeat === b.id}
-              onChoose={() => choose(b)}
-              job={jobs[b.id]}
-              patch={(p, ok) => patch(b.id, p, ok)}
-              action={(a, i, ok) => action(b.id, a, i, ok)}
-              notify={notify}
-            />
-          ))}
-        </div>
+        {v.manualImages && v.status !== "listen" && v.beats.length > 0 && (
+          <div className="seg-views" role="group" aria-label="Affichage">
+            <button aria-pressed={planche} onClick={() => setBoard(true)}>
+              <LayoutGrid size={14} /> La Planche
+            </button>
+            <button aria-pressed={!planche} onClick={() => setBoard(false)}>
+              <List size={14} /> Le Fil
+            </button>
+          </div>
+        )}
+
+        {planche ? (
+          <Planche v={v} notify={notify} onSearch={(id) => action(id, "images", undefined, "La Régie cherche pour cette idée…")} />
+        ) : (
+          <div className="beats">
+            {v.beats.map((b) => (
+              <BeatRow
+                key={b.id}
+                b={b}
+                v={v}
+                selected={sel === b.id}
+                current={nowBeat === b.id}
+                onChoose={() => choose(b)}
+                job={jobs[b.id]}
+                patch={(p, ok) => patch(b.id, p, ok)}
+                action={(a, i, ok) => action(b.id, a, i, ok)}
+                notify={notify}
+              />
+            ))}
+          </div>
+        )}
 
         {v.sources.length > 0 && (
           <details className="panel" style={{ marginTop: 10 }}>

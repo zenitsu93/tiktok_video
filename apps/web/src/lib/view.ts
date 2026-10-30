@@ -19,6 +19,8 @@ export interface BeatView {
   end: number;
   voiceStale: boolean;
   queries: string[];
+  /** "cover": the album cover (Deezer, free); "none": text only. */
+  queryKind: "cover" | "pinterest" | "none";
 }
 
 export interface VideoView {
@@ -36,6 +38,8 @@ export interface VideoView {
   images: Record<string, { url: string; accent: string | null; w?: number; h?: number; clean?: string; checker?: boolean }>;
   cover: string | null;
   sources: string[];
+  /** « Je cherche moi-même » was chosen at the voice: the images come from La Planche. */
+  manualImages: boolean;
   /** The script waiting for approval, before it is cut into shots. */
   draft: string | null;
   /** The TikTok caption with its hashtags, to paste in TikTok. */
@@ -113,10 +117,12 @@ export async function videoView(row: VideoRow): Promise<VideoView> {
       end: b.end,
       voiceStale: voiceStale(b, lexicon),
       queries: b.imageQuery.queries,
+      queryKind: b.imageQuery.kind,
     })),
     images,
     cover: doc.cover,
     sources: doc.sources,
+    manualImages: Boolean(doc.manualImages),
     draft: doc.beats.length ? null : (doc.draft ?? null),
     caption: doc.caption ?? null,
     voice: doc.voiceTrack ? signMedia(doc.voiceTrack, 6 * 3600) : null,
