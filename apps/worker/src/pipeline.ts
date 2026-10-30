@@ -309,7 +309,9 @@ export async function generate(videoId: string) {
     const found = new Set((await load(videoId)).doc.beats.filter((b) => b.candidates.length).map((b) => b.id));
     const missing = todo.filter((g) => !g.some((id) => found.has(id)));
     const first = failed.find((f) => f.error instanceof BudgetError) ?? failed[0]!;
-    const message = `Pas d'images pour ${missing.length} ${missing.length > 1 ? "idées" : "idée"}, à partir de ${missing[0]?.[0] ?? first.beats[0]}. ${first.error.message}`;
+    // over budget, Thomas can still finish the video with his own pictures, which cost nothing
+    const own = first.error instanceof BudgetError ? " Tu peux mettre tes propres images avec « Ma photo » dans ces plans, puis cliquer sur « Reprendre »." : "";
+    const message = `Pas d'images pour ${missing.length} ${missing.length > 1 ? "idées" : "idée"}, à partir de ${missing[0]?.[0] ?? first.beats[0]}. ${first.error.message}${own}`;
     throw first.error instanceof BudgetError ? new BudgetError(message) : new Error(message);
   }
   if (!(await load(videoId)).doc.cover) await coverFor(videoId);
@@ -466,12 +468,21 @@ export async function render(videoId: string) {
   // so the export never carries the old reading
   const lexicon = await pronunciationLexicon(db());
   const stale = row.doc.beats.filter((b) => voiceStale(b, lexicon));
+  let revoiced = 0;
   for (const [k, b] of stale.entries()) {
     await setProgress(db(), videoId, { step: "Voix à refaire", done: k, total: stale.length });
-    await voiceBeat(videoId, b.id, false);
+    try {
+      await voiceBeat(videoId, b.id, false);
+      revoiced++;
+    } catch (e) {
+      // over budget, the line keeps its last voice: a video with an old reading beats no video
+      if (!(e instanceof BudgetError)) throw e;
+      console.warn(`[render] ${videoId} ${b.id} : voix gardée, ${e.message}`);
+      break;
+    }
   }
-  if (stale.length) await remixVoice(videoId);
-  const doc = stale.length ? (await load(videoId)).doc : row.doc;
+  if (revoiced) await remixVoice(videoId);
+  const doc = revoiced ? (await load(videoId)).doc : row.doc;
   const res = await exportVideo(videoId, doc, (done, total) => setProgress(db(), videoId, { step: "Montage des plans", done, total }));
   await setRendered(db(), videoId, res.asset.id, res.hashes);
   await setStatus(db(), videoId, "ready");
