@@ -290,11 +290,11 @@ export function Fil({ initial }: { initial: VideoView }) {
   });
 
   const nowBeat = v.beats.findLast((b) => b.start <= t + 0.01)?.id;
-  // the first pass, from "Lancer" to the first MP4
-  // (between the last image and the export job starting, the video is briefly "ready" without an MP4)
-  const firstRun = !v.download && (v.status === "generating" || v.status === "rendering" || (v.status === "ready" && v.beats.length > 0 && !v.costs.some((c) => c.provider === "render")));
+  // the first pass, from "Lancer" to the first MP4, while a step is at work
+  const firstRun = !v.download && (v.status === "generating" || v.status === "rendering");
   const voiceMissing = v.beats.some((b) => b.voiceStale);
-  const canRender = v.beats.length > 0 && v.status !== "generating" && v.status !== "rendering";
+  // the montage only once the voice is approved and the images are there
+  const canRender = v.beats.length > 0 && v.status !== "generating" && v.status !== "rendering" && v.status !== "listen";
   const upToDate = Boolean(v.download) && v.dirty.length === 0 && !voiceMissing;
 
   // the script waits to be read and approved before anything paid is spent
@@ -348,7 +348,7 @@ export function Fil({ initial }: { initial: VideoView }) {
                 onClick={() => run(() => call(`${url}/render`, "POST"), v.download ? "Seuls les plans modifiés repassent au rendu" : "Montage lancé")}
               >
                 {v.status === "rendering" ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
-                {v.status === "rendering" ? "Montage…" : v.download ? "Mettre à jour le MP4" : "Exporter le MP4"}
+                {v.status === "rendering" ? "Montage…" : v.download ? "Mettre à jour le MP4" : "Monter la vidéo"}
               </button>
             )}
             {v.download && !upToDate && (
@@ -388,6 +388,32 @@ export function Fil({ initial }: { initial: VideoView }) {
                 </div>
               </div>
             )
+          )}
+          {v.status === "listen" && (
+            <div className="panel step" role="status">
+              <b>Étape 2 : écoute la voix</b>
+              <span className="mute">
+                Lance l&apos;aperçu (▶). Un mot mal dit : « Prononciation », sous l&apos;aperçu. Une phrase à changer : clique dessus. Les images ne sont cherchées
+                qu&apos;après ta validation.
+              </span>
+              <button
+                className="btn primary sm"
+                style={{ alignSelf: "flex-start" }}
+                disabled={v.busy.length > 0 || voiceMissing}
+                title={v.busy.length > 0 || voiceMissing ? "Une ligne attend encore sa voix" : undefined}
+                onClick={() => run(() => call(`${url}/voice`, "POST").then(refresh), "Voix validée : recherche des images")}
+              >
+                <Mic size={15} /> Valider la voix
+              </button>
+            </div>
+          )}
+          {v.status === "ready" && !v.download && (
+            <div className="panel step" role="status">
+              <b>Étape 3 : vérifie les images</b>
+              <span className="mute">
+                Regarde l&apos;aperçu et change ce qui ne va pas (clique sur une phrase). Puis « Monter la vidéo » : à la fin du montage, elle part sur TikTok.
+              </span>
+            </div>
           )}
           {v.error && (
             <div className="chips" style={{ alignItems: "center" }}>

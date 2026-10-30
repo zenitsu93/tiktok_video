@@ -2,6 +2,7 @@ const LABELS = {
   draft: ["Brouillon", ""],
   review: ["Script à valider", "warn"],
   generating: ["En préparation", "warn"],
+  listen: ["Voix à écouter", "warn"],
   ready: ["Prête", "ok"],
   rendering: ["Montage", "warn"],
   error: ["Erreur", "hot"],
