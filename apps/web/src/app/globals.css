@@ -335,3 +335,37 @@ body.resizing iframe { pointer-events: none; }
 .insp .grp.drop { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 8px; }
 label.btn.off { opacity: 0.5; pointer-events: none; }
 button.chip { cursor: pointer; border: 0; font-family: inherit; }
+
+/* La Planche: « je cherche moi-même », one tile per idea */
+.seg-views { display: inline-flex; align-self: flex-start; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.seg-views button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 5px 14px; font-size: 14px; font-weight: 400; cursor: pointer; }
+.seg-views button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.planche { display: flex; flex-direction: column; gap: 12px; }
+.planche-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.planche-count { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
+.planche-count small { font-size: 14px; font-weight: 400; color: var(--mute); }
+.planche-prog { flex: 1; min-width: 120px; height: 6px; border-radius: 6px; background: var(--panel2); overflow: hidden; }
+.planche-prog i { display: block; height: 100%; background: var(--ok); transition: width .3s; }
+.planche-help { font-family: system-ui, sans-serif; font-size: 13px; margin: 0; max-width: 72ch; }
+kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; background: var(--panel); }
+.planche-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; }
+.tile { border: 1px solid var(--line); border-radius: 12px; background: var(--paper); padding: 10px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; min-width: 0; }
+.tile.lit { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.tile.drop { outline: 2px dashed var(--accent); outline-offset: 3px; }
+.tile-id { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.tile .ok-ic { color: var(--ok); }
+.tile-slot { aspect-ratio: 4 / 5; border-radius: 8px; border: 1.5px dashed var(--line); display: grid; place-items: center; text-align: center; font-family: system-ui, sans-serif; font-size: 12.5px; color: var(--mute); overflow: hidden; background: var(--panel); cursor: pointer; }
+.tile.lit .tile-slot { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.tile.done .tile-slot { border: 0; }
+.tile-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile-wait { display: inline-flex; align-items: center; gap: 6px; }
+.tile-text { margin: 0; font-family: system-ui, sans-serif; font-size: 12.5px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tile-kws { display: flex; flex-wrap: wrap; gap: 4px; }
+.tile-pin { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-family: system-ui, sans-serif; font-size: 12px; text-decoration: none; border-radius: 999px; padding: 3px 9px; background: #e60023; color: #fff; }
+.tile-pin svg { flex: none; }
+.tile-pin span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile-pin:hover { background: #c8001e; }
+.tile-cands { display: flex; gap: 4px; }
+.tile-cands button { flex: 1; aspect-ratio: 4 / 5; padding: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; cursor: pointer; background: var(--panel2); min-width: 0; }
+.tile-cands img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile-auto { align-self: flex-start; font-size: 12.5px; color: var(--mute); }

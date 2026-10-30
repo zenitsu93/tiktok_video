@@ -282,7 +282,9 @@ export async function generate(videoId: string) {
   });
   // groups that already have images were done before a cut
   const done = new Set((await load(videoId)).doc.beats.filter((b) => b.candidates.length).map((b) => b.id));
-  const todo = groups.filter((g) => !g.every((id) => done.has(id)));
+  // « je cherche moi-même » : only the album cover (Deezer, free) is fetched, the rest waits on La Planche
+  const manual = Boolean((await load(videoId)).doc.manualImages);
+  const todo = groups.filter((g) => !g.every((id) => done.has(id)) && (!manual || beats.find((b) => b.id === g[0])!.imageQuery.kind === "cover"));
   // four ideas at a time (Apify runs five at most): the same searches, just sooner
   const imageLimit = pLimit(4);
   let found = groups.length - todo.length;
@@ -321,7 +323,8 @@ export async function generate(videoId: string) {
   // the montage waits for Thomas too: he checks the shots, then « Monter la vidéo » (which then goes to TikTok);
   // meanwhile the scenes are made ahead, so that click has little left to do
   await setStatus(db(), videoId, "ready", null, notice);
-  await enqueue(JOBS.prerender, { videoId });
+  // by hand, the scenes are made ahead as the pictures come in (each « Ma photo » starts it)
+  if (!manual) await enqueue(JOBS.prerender, { videoId });
 }
 
 /** The head start (see prerenderScenes): runs while the video waits at « ready », stops at the first change. */
@@ -415,16 +418,18 @@ export async function moreImages(videoId: string, beatId: string, instruction?: 
 /**
  * An image Thomas uploaded for a beat (when the search found nothing, or the budget ran out):
  * cleaned like any other (decoded, stripped, resized), put first among the candidates and shown.
+ * `also`: the other beats of the same idea (La Planche gives one picture to the whole idea).
  */
-export async function ownImage(videoId: string, beatId: string, key: string) {
+export async function ownImage(videoId: string, beatId: string, key: string, also: string[] = []) {
+  const ids = new Set([beatId, ...also]);
   await onBeat(videoId, beatId, async () => {
     try {
       const asset = await ingestImage(await storage().read(key), "moi");
-      await mutateDoc(db(), videoId, `${beatId} : ma photo`, (d) => ({
+      await mutateDoc(db(), videoId, `${[...ids].join(",")} : ma photo`, (d) => ({
         ...d,
         assets: { ...d.assets, [asset.id]: asset },
         beats: d.beats.map((b) =>
-          b.id === beatId
+          ids.has(b.id)
             ? { ...b, image: asset.id, candidates: [asset.id, ...b.candidates.filter((c) => c !== asset.id)], layout: b.layout === "card" || b.layout === "cutout" ? b.layout : ("card" as const) }
             : b,
         ),

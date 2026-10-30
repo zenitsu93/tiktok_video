@@ -13,6 +13,7 @@ const TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
 /**
  * « Ma photo »: the file is the request body. It is only parked here; the worker decodes and
  * re-encodes it (nothing from the original file reaches the renderer), then shows it on the beat.
+ * `?also=b02,b03`: the other beats of the same idea get the same picture (La Planche).
  */
 export const POST = route(async (req, { params }: Ctx) => {
   const p = await params;
@@ -26,8 +27,14 @@ export const POST = route(async (req, { params }: Ctx) => {
   const file = Buffer.from(await req.arrayBuffer());
   if (!file.length) throw new HttpError(400, "Image vide.");
   if (file.length > MAX) throw new HttpError(413, "Image trop lourde (9 Mo au plus).");
+  const also = (new URL(req.url).searchParams.get("also") ?? "")
+    .split(",")
+    .filter(Boolean)
+    .map(beatId)
+    .filter((b) => b !== beat && row.doc.beats.some((x) => x.id === b))
+    .slice(0, 40);
   const key = `uploads/${randomUUID()}`;
   await storage().put(key, file, type);
-  await enqueue(JOBS.upload, { videoId: id, beatId: beat, key });
+  await enqueue(JOBS.upload, { videoId: id, beatId: beat, key, also });
   return NextResponse.json({ queued: true }, { status: 202 });
 });
