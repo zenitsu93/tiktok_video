@@ -154,7 +154,12 @@ export async function imagesFor(videoId: string, beatIds: string[], opts: { quer
     if (providers().images) {
       const urls: string[] = [];
       const variant = opts.fresh ? ` ${VARIANTS[Math.floor(first.candidates.length / want) % VARIANTS.length]}` : "";
-      for (const q of query.queries) urls.push(...(await searchPinterest(videoId, q + variant, want)));
+      // the next search of the idea only when the ones before did not bring enough new pins:
+      // most ideas fill up on their first search, and every pin returned is billed
+      for (const q of query.queries) {
+        if (new Set(urls.filter((u) => !known.has(u))).size >= want) break;
+        urls.push(...(await searchPinterest(videoId, q + variant, want)));
+      }
       for (const url of [...new Set(urls)].filter((u) => !known.has(u))) {
         if (added.length >= want) break;
         try {
