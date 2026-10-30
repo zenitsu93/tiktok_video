@@ -130,6 +130,13 @@ N'utilise jamais `linear` ni `power1` pour un mouvement visible (seule exception
 - **Texte au gris, la carte grandit** : à la fin d'un groupe, le texte au-dessus de la carte passe au gris (0.15 s) et s'efface, et la carte portrait grandit (`scale 1 → 1.3`, origine en haut, 0.4 s, `smooth`) pour prendre la place libérée avant le groupe suivant.
 - **Fin « le vinyle tombe »** (variante de l'outro, quand la boucle de couverture n'est pas voulue) : le vinyle tombe d'en haut à droite et se pose au centre en tournant (0.55 s, `smooth`), le titre apparaît en gris clair puis fonce au noir (Regular ≈ 120 px), l'artiste dessous en Light Italic (jamais une police script).
 
+**Variations relevées sur « The Lost Children »** :
+- **Entrée inclinée en arc** : la carte arrive petite et penchée depuis le bas-gauche (`x −260, y +420, rotation −9°, scale 0.55`), passe par une position intermédiaire et se redresse à sa place (0.18 s puis 0.35 s `smooth`) sous un texte déjà tapé. Variante plus vivante du glissé diagonal.
+- **Image floue pour le mystère** : quand le texte parle de quelque chose de caché, d'oublié ou de peu connu (« les **moins** connues », « son secret le plus intime »), la carte (ou pochette + vinyle) se floute volontairement (`blur 0 → 10 px`, 0.6 s, `sine.inOut`) et reste floue sous le texte. C'est le seul cas où une image floue est permise.
+- **La carte change de format** : sur le même emplacement, l'image suivante a un autre format (paysage → portrait) ; la carte change de forme en 0.35 s (`inout`) en animant son `clip-path: inset(... round 40px)` sur une boîte fixe (jamais `width`/`height`), et l'image change au même instant. Le texte au-dessus ne bouge pas.
+- **Texte sous la carte, trois styles dans la ligne** : la ligne se pose sous la carte, alignée sur son bord gauche, et mélange Regular, Black Italic et Black plus grand dans la même ligne (« le ***propre fils*** de **Michael** »), alignée sur la ligne de base. Compte comme l'unique italique de l'écran.
+- **La carte s'évapore au blanc** : fin de chapitre douce, la carte pâlit et s'efface dans le blanc (`opacity 0, brightness 1.6, blur 4 px, scale 1.03`, 0.6 s, `inout`). Alternative à l'effondrement en point, au plus 2 fois par vidéo.
+
 Règles de rythme :
 - Un nouvel élément (texte, carte ou changement de carte) **toutes les 1 à 2 s**. Une image reste rarement plus de 4 s, sauf une vidéo qui joue.
 - Les entrées d'images tombent **sur le mot** auquel elles correspondent dans la voix, pas avant.
@@ -234,7 +241,7 @@ Rends chaque version dans son propre fichier (`<titre>-vA.mp4`, `-vB.mp4`…) et
 
 - Vérifie dans un snapshot que la police chargée est bien Kaneda (lettres très condensées) et que les graisses sont distinctes.
 - `npx hyperframes check --json` sans erreur.
-- `npx hyperframes snapshot --review` puis compare avec une vidéo de référence de la personne : `snapshot --at <t,…> --against ref.mp4`. Vérifie : fond blanc partout, une seule idée par écran, mots héros bien choisis, entrées d'images synchrones avec la voix, aucune image floue ni filigrane étranger visible en grand.
+- `npx hyperframes snapshot --review` puis compare avec une vidéo de référence de la personne : `snapshot --at <t,…> --against ref.mp4`. Vérifie : fond blanc partout, une seule idée par écran, mots héros bien choisis, entrées d'images synchrones avec la voix, aucune image floue (sauf « Image floue pour le mystère ») ni filigrane étranger visible en grand.
 - Vérifie la frame 0 : elle doit déjà montrer la couverture complète (pochette, vinyle, titre, artiste), et la dernière image doit être la même.
 - Pour la relecture, publie une page plan par plan (vidéo, vignette de chaque plan, champ de commentaire enregistré) et corrige à partir des commentaires ; ajoute ici toute règle qui en sort.
 - Ouvre l'aperçu dans l'app HyperFrames et laisse la personne valider avant le rendu final 1080×1920.
