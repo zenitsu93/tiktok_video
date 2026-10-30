@@ -1,7 +1,7 @@
 "use client";
 
 import { ENTRANCE_LABELS, ENTRANCES, LAYOUT_LABELS, LAYOUTS, type BeatPatch } from "@regie/core";
-import { ArrowLeft, Download, Image as ImageIcon, Loader2, Maximize2, Mic, Minimize2, Pause, Play, RotateCcw, Send, Sparkles, Undo2, Wand2 } from "lucide-react";
+import { ArrowLeft, Download, Image as ImageIcon, Loader2, Maximize2, Mic, Minimize2, Pause, Play, RotateCcw, Scissors, Send, Sparkles, Undo2, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BeatView, VideoView } from "@/lib/view";
@@ -13,7 +13,7 @@ import { TikTokSend, tiktokMoving } from "./tiktok-send";
 import { StatusChip } from "./status";
 import { chime, Fan, Grooves, LineBusy, Platine, Sleeve, stageOf } from "./waits";
 
-type Job = { kind: "images" | "voice" | "rewrite"; query?: string; at: number };
+type Job = { kind: "images" | "clean" | "voice" | "rewrite"; query?: string; at: number };
 
 const SIDE_DEFAULT = 360;
 const clampSide = (w: number) => Math.round(Math.min(Math.max(w, 260), Math.max(260, Math.min(900, (typeof window === "undefined" ? 1400 : window.innerWidth) - 420))));
@@ -313,7 +313,7 @@ export function Fil({ initial }: { initial: VideoView }) {
     if (p.text !== undefined) track(id, "voice");
     return run(() => call(`${url}/beats/${id}`, "PATCH", p), ok);
   };
-  const action = (id: string, a: "images" | "voice" | "rewrite", instruction?: string, ok?: string) => {
+  const action = (id: string, a: "images" | "clean" | "voice" | "rewrite", instruction?: string, ok?: string) => {
     track(id, a, a === "images" ? instruction || v.beats.find((b) => b.id === id)?.queries[0] : undefined);
     return run(() => call(`${url}/beats/${id}/${a}`, "POST", instruction ? { instruction } : {}), ok);
   };
@@ -639,7 +639,7 @@ function BeatRow({
   job?: Job;
   onChoose: () => void;
   patch: (p: BeatPatch, ok?: string) => void;
-  action: (a: "images" | "voice" | "rewrite", instruction?: string, ok?: string) => void;
+  action: (a: "images" | "clean" | "voice" | "rewrite", instruction?: string, ok?: string) => void;
   lexicon: Lexicon;
 }) {
   const img = b.image ? v.images[b.image] : b.layout === "vinyl" && v.cover ? v.images[v.cover] : undefined;
@@ -693,7 +693,7 @@ function Inspector({
   busy: boolean;
   job?: Job;
   patch: (p: BeatPatch, ok?: string) => void;
-  action: (a: "images" | "voice" | "rewrite", instruction?: string, ok?: string) => void;
+  action: (a: "images" | "clean" | "voice" | "rewrite", instruction?: string, ok?: string) => void;
   lexicon: Lexicon;
 }) {
   const [text, setText] = useState(b.text);
@@ -708,6 +708,11 @@ function Inspector({
   const words = b.text.split(/\s+/).map((w) => w.replace(/^[«"“(]+|[.,;:!?…»"”)]+$/g, "")).filter(Boolean);
   const changed = text.trim() !== b.text;
   const imageLayouts = b.layout === "card" || b.layout === "cutout";
+  // the candidate shown now, and its cut-out version when there is one
+  const current = b.candidates.find((c) => c === b.image || (v.images[c]?.clean && v.images[c]?.clean === b.image));
+  const cutId = current ? v.images[current]?.clean : undefined;
+  const isClean = Boolean(cutId && b.image === cutId);
+  const cleaning = job?.kind === "clean";
 
   return (
     <div className="insp">
@@ -758,14 +763,61 @@ function Inspector({
         {job?.kind === "images" && <Fan query={job.query} />}
         {b.candidates.length > 0 && (
           <div className="cands">
-            {b.candidates.map((c) =>
-              v.images[c] ? (
-                <button key={c} aria-pressed={b.image === c} onClick={() => patch({ image: c, ...(imageLayouts ? {} : { layout: "card" as const }) })} aria-label="Choisir cette image">
+            {b.candidates.map((c) => {
+              const img = v.images[c];
+              if (!img) return null;
+              const cut = img.clean ? v.images[img.clean] : undefined;
+              const pressed = c === current;
+              // a pin that came on a checkerboard is shown cut out, unless « Original » was chosen
+              const showCut = Boolean(cut && (pressed ? isClean : img.checker));
+              const pick = () =>
+                patch(
+                  showCut && img.clean
+                    ? { image: img.clean, layout: b.layout === "card" || !imageLayouts ? "cutout" : b.layout }
+                    : // leaving a cut-out for a plain picture puts it back in a card
+                      { image: c, ...(!imageLayouts || (isClean && b.layout === "cutout") ? { layout: "card" as const } : {}) },
+                );
+              return (
+                <button key={c} aria-pressed={pressed} onClick={pick} aria-label={showCut ? "Choisir cette image, fond nettoyé" : "Choisir cette image"} className={showCut ? "cut" : undefined}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={v.images[c].url} alt="" loading="lazy" />
+                  <img src={(showCut ? cut! : img).url} alt="" loading="lazy" />
+                  {showCut && (
+                    <span className="scissors" aria-hidden="true">
+                      <Scissors size={11} />
+                    </span>
+                  )}
+                  {pressed && cleaning && <span className="shimmer" aria-hidden="true" />}
                 </button>
-              ) : null,
-            )}
+              );
+            })}
+          </div>
+        )}
+        {current && imageLayouts && (
+          <div className="bgrow">
+            <div className="bgseg" data-v={isClean ? "clean" : "orig"} role="group" aria-label="Fond de l'image">
+              <span className="thumb" aria-hidden="true" />
+              <button
+                aria-pressed={!isClean}
+                disabled={busy}
+                onClick={() => isClean && patch({ image: current, ...(b.layout === "cutout" ? { layout: "card" as const } : {}) }, "Image d'origine remise")}
+              >
+                Original
+              </button>
+              <button
+                aria-pressed={isClean}
+                disabled={busy}
+                onClick={() => {
+                  if (isClean) return;
+                  if (cutId) patch({ image: cutId, layout: b.layout === "card" ? "cutout" : b.layout }, "Fond nettoyé");
+                  else action("clean", undefined, "Détourage en cours…");
+                }}
+              >
+                {cleaning && <Loader2 size={13} className="spin" />} Fond nettoyé
+              </button>
+            </div>
+            <span className="mute" style={{ fontSize: 13 }}>
+              {cleaning ? "Détourage en cours…" : isClean && v.images[current]?.checker ? "Damier repéré, fond enlevé tout seul." : isClean ? "Sujet posé sur le blanc." : ""}
+            </span>
           </div>
         )}
         <div className="chips">

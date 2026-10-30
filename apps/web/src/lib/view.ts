@@ -32,7 +32,8 @@ export interface VideoView {
   version: number;
   total: number;
   beats: BeatView[];
-  images: Record<string, { url: string; accent: string | null; w?: number; h?: number }>;
+  /** clean: the same image without its background; checker: it came on a fake checkerboard. */
+  images: Record<string, { url: string; accent: string | null; w?: number; h?: number; clean?: string; checker?: boolean }>;
   cover: string | null;
   sources: string[];
   /** The script waiting for approval, before it is cut into shots. */
@@ -74,11 +75,12 @@ export async function videoView(row: VideoRow): Promise<VideoView> {
   const { beats, total } = doc.beats.length ? timeBeats(doc) : { beats: [], total: 0 };
   const images: VideoView["images"] = {};
   const want = new Set<string>();
-  doc.beats.forEach((b: Beat) => b.candidates.forEach((c) => want.add(c)));
+  // each candidate, and its cut-out version when it has one
+  doc.beats.forEach((b: Beat) => b.candidates.forEach((c) => [c, doc.assets[c]?.clean].forEach((id) => id && want.add(id))));
   if (doc.cover) want.add(doc.cover);
   for (const id of want) {
     const a = doc.assets[id];
-    if (a?.kind === "image") images[id] = { url: signMedia(id, 6 * 3600), accent: a.accent ?? null, w: a.width, h: a.height };
+    if (a?.kind === "image") images[id] = { url: signMedia(id, 6 * 3600), accent: a.accent ?? null, w: a.width, h: a.height, clean: a.clean, checker: a.checker };
   }
   const send = await lastTikTokSend(getDb(), row.id);
   const pronunciations = await listPronunciations(getDb());

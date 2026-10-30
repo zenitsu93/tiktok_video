@@ -54,6 +54,10 @@ export const assetSchema = z.object({
   /** Hero colour sampled from the image, darkened to stay readable on white. */
   accent: z.string().regex(/^#[0-9a-f]{6}$/i).nullable().optional(),
   source: z.string().max(2048).optional(),
+  /** The same image without its background (an asset id), once it has been cut out. */
+  clean: z.string().max(80).optional(),
+  /** The original came with a flattened checkerboard instead of a background: it is shown cut out. */
+  checker: z.boolean().optional(),
 });
 export type Asset = z.infer<typeof assetSchema>;
 

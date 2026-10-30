@@ -36,6 +36,10 @@ const schema = z.object({
   APIFY_TOKEN: optional,
   APIFY_PINTEREST_ACTOR: z.string().default("automation-lab~pinterest-scraper"),
 
+  /** rembg's command line, to cut out images without a checkerboard (« Fond nettoyé »). Empty: checkerboards only. */
+  REMBG_BIN: optional,
+  REMBG_MODEL: z.string().default("silueta"),
+
   /** TikTok app (Login Kit + Content Posting API, video.upload only): sends exports to the TikTok inbox. */
   TIKTOK_CLIENT_KEY: optional,
   TIKTOK_CLIENT_SECRET: optional,

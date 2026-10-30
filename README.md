@@ -18,6 +18,8 @@ Ensuite je relis. Le script s'affiche phrase par phrase, et chaque phrase est un
 4. Apify va chercher des images sur Pinterest, Deezer donne la pochette. Rien ne se monte tout seul : je regarde l'aperçu, je change les images qui ne vont pas, puis « Monter la vidéo ».
 5. HyperFrames monte chaque plan en 1080×1920, en Kaneda Gothic, fond blanc. La vidéo s'ouvre et se ferme sur la « Pochette » : le vinyle sort de la pochette de la chanson, avec le titre et l'artiste. ffmpeg colle les plans et pose la voix. À la fin du montage, la vidéo part dans ma boîte de réception TikTok.
 
+Les images Pinterest qui arrivent avec un faux fond transparent (le damier gris et blanc incrusté dans l'image) sont repérées toutes seules : la Régie enlève le damier et pose le sujet sur le blanc, en mise en page « Détourage ». Si le détourage rate, l'image est écartée et on prend la suivante. Sous les images d'un plan, la bascule « Original | Fond nettoyé » remet l'original ou, sur une image normale au fond moche, enlève le fond avec rembg (gratuit, sur le serveur, quelques secondes). Le ciseau sur une vignette dit qu'elle est montrée sans son fond.
+
 Si la connexion lâche pendant une génération, la tâche réessaie toute seule. Si elle finit quand même en erreur, le bouton « Reprendre » repart de là où elle s'était arrêtée. Une vidéo à qui il manque des images (Apify qui refuse, plafond atteint) s'arrête avant le montage, avec la raison : elle ne part jamais comme un mur de texte. « Reprendre » ne va chercher que les images manquantes.
 
 Kaneda Gothic est dans le dépôt (`brand/fonts/kaneda/`, voir son README). Ce n'est pas une police libre : garde le dépôt privé. L'app, elle, reste en Oswald.

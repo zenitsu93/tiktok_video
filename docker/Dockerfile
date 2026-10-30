@@ -4,8 +4,14 @@ FROM node:22-bookworm-slim
 # ffmpeg pour coller les plans, et ce qu'il faut à Chrome pour le rendu HyperFrames
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
       libnss3 libatk-bridge2.0-0 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libasound2 libpango-1.0-0 libcairo2 fonts-liberation \
+      python3 python3-venv \
     && rm -rf /var/lib/apt/lists/* && corepack enable && useradd -m regie \
     && mkdir -p /app /data && chown regie /app /data
+# rembg pour « Fond nettoyé » sur les images sans damier, avec son modèle (silueta, libre et léger :
+# environ 800 Mo de mémoire le temps d'un détourage), téléchargé ici plutôt qu'au premier clic
+ENV U2NET_HOME=/opt/rembg/models REMBG_BIN=/opt/rembg/bin/rembg
+RUN python3 -m venv /opt/rembg && /opt/rembg/bin/pip install --no-cache-dir "rembg[cpu,cli]==2.0.84" \
+    && /opt/rembg/bin/rembg d silueta && chmod -R a+rX /opt/rembg
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 WORKDIR /app
 USER regie

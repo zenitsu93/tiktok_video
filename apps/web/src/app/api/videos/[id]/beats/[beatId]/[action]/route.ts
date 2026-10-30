@@ -10,7 +10,8 @@ const instruction = z.string().trim().max(500);
 
 /**
  * One-line actions that go through the worker:
- * images (next results, or a new search when there is an instruction), voice, rewrite (Claude).
+ * images (next results, or a new search when there is an instruction), clean (cut the background
+ * out of the shown image), voice, rewrite (Claude).
  */
 export const POST = route(async (req, { params }: Ctx) => {
   const p = await params;
@@ -22,6 +23,9 @@ export const POST = route(async (req, { params }: Ctx) => {
   switch (p.action) {
     case "images":
       await enqueue(JOBS.images, { videoId: id, beatId: beat, instruction: data.instruction || undefined });
+      break;
+    case "clean":
+      await enqueue(JOBS.clean, { videoId: id, beatId: beat });
       break;
     case "voice":
       await enqueue(JOBS.voice, { videoId: id, beatId: beat });

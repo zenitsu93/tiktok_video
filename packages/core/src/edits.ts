@@ -12,7 +12,9 @@ export function applyBeatPatch(doc: VideoDoc, beatId: string, patch: BeatPatch):
   if (i < 0) throw new EditError(`Le plan ${beatId} n'existe pas.`);
   const before = doc.beats[i]!;
   const next: Beat = { ...before, ...patch };
-  if (patch.image !== undefined && patch.image !== null && !next.candidates.includes(patch.image)) {
+  // a candidate, or its version without background
+  const allowed = new Set(next.candidates.flatMap((c) => [c, doc.assets[c]?.clean ?? c]));
+  if (patch.image !== undefined && patch.image !== null && !allowed.has(patch.image)) {
     throw new EditError("Cette image n'appartient pas aux images de ce plan.");
   }
   if (next.hero && !next.text.toLowerCase().includes(next.hero.toLowerCase())) {
