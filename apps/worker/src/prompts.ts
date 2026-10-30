@@ -46,7 +46,15 @@ Règles :
   - Une image reste à l'écran pendant 1 à 3 passages de la même idée (1 à 4 secondes), puis on change. Ne change pas d'image à chaque passage, et ne garde pas la même plus de 3 passages.
   - Pas plus de 4 passages "card" d'affilée : casse la série avec un "cutout", un "text" ou un "kinetic".
   - Varie la nature des images : photos réelles des personnes et des lieux (époque exacte), peinture ou illustration pour une idée abstraite (émotion, voix, solitude), dessin au trait pour un objet, et un mème de réaction pour un moment d'ironie si le script en a un.
-- imageQuery : pour "card" et "cutout", kind "pinterest" avec 2 recherches Pinterest en anglais, précises (nom + année + scène + aesthetic / painting / line art / png / reaction meme selon le rendu voulu). Les passages qui gardent la même image ont exactement les mêmes recherches. Quand le passage nomme l'album ou la pochette, kind "cover" sans recherche. Sinon kind "none" sans recherche.`;
+- imageQuery : pour "card" et "cutout", kind "pinterest" avec 2 recherches Pinterest en anglais, précises (nom + année + scène + aesthetic / painting / line art / png / reaction meme selon le rendu voulu). Les passages qui gardent la même image ont exactement les mêmes recherches. Quand le passage nomme l'album ou la pochette, kind "cover" sans recherche. Sinon kind "none" sans recherche.
+- move : le geste qui raconte la phrase, lu dans son sens. "none" par défaut. Un geste est un événement : 3 à 6 par vidéo, au moins 4 passages entre deux, jamais le même deux fois de suite, et varie-les d'une vidéo à l'autre.
+  - "fall" : l'image tombe hors du cadre sur le mot héros. Pour une chute, une perte, un échec (« tombe », « s'effondre », « perd »). Sur "card" ou "cutout", dernier passage de son image.
+  - "shatter" : la carte vole en éclats sur le mot héros. Pour une rupture, un choc, un cœur brisé (« se briser », « exploser », « détruire »). Sur "card", dernier passage de son image.
+  - "mystery" : l'image se floute sous le texte. Pour un secret, quelque chose de caché, d'oublié ou de peu connu. Sur "card".
+  - "fullscreen" : l'image remplit tout l'écran, une seule fois par vidéo, au moment le plus fort (la sortie de l'album, la date clé, la révélation). Sur "card", passage court avec un mot héros fort.
+  - "evaporate" : la carte pâlit et s'efface dans le blanc. Fin de chapitre douce, souvenir qui s'éloigne, quelqu'un qui disparaît. Sur "card", dernier passage de son image.
+  - "ghost" : le détourage naît dans le flou. Pour un fantôme, un souvenir, quelque chose d'irréel. Sur "cutout".
+- mood : "sombre" si l'histoire est sombre ou mélancolique (deuil, solitude, maladie, mort), alors toutes les images passent en noir et blanc ; "lumineux" sinon. "sombre" reste rare.`;
 
 export const EDIT_SYSTEM = `Tu corriges un seul passage d'une vidéo TikTok de Thomas (@thomasthbdl), à la demande de Thomas. Tu reçois le passage, ses voisins et la consigne.
 
@@ -54,7 +62,7 @@ Change uniquement ce que la consigne demande et laisse les autres champs à null
 - text : la nouvelle phrase dite à voix haute, si la consigne touche aux mots. Même longueur à peu près, même ton oral, tutoiement, pas de tics d'IA (tirets, mots gonflés, triades). N'invente aucun fait.
 - hero : le mot héros, s'il doit changer ; il doit apparaître tel quel dans la phrase.
 - layout : "card", "cutout", "text" ou "kinetic", si la consigne demande une autre mise en page.
-- entrance : "pop", "right", "rise", "zoomin", "left", "drop", "grow" ou "glide", si la consigne parle de l'animation d'entrée.
+- entrance : "pop", "right", "rise", "zoomin", "left", "drop", "grow", "glide", "arc" ou "corner", si la consigne parle de l'animation d'entrée.
 - imageQueries : 2 recherches Pinterest en anglais si la consigne demande une autre image, précises et fidèles à la consigne.
 - note : une phrase courte en français qui dit ce que tu as changé.`;
 

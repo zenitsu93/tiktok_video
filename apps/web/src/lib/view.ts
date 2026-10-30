@@ -1,4 +1,4 @@
-import { timeBeats, voiceStale, type Beat, type Layout, type Entrance } from "@regie/core";
+import { timeBeats, voiceStale, type Beat, type Layout, type Entrance, type Move } from "@regie/core";
 import { getDb, lastTikTokSend, listPronunciations, videoCosts, type TikTokSendStatus, type VideoRow } from "@regie/db";
 import { dirtyBeats, providers, signMedia, tiktokConfigured, tiktokConnected } from "@regie/server";
 
@@ -9,6 +9,8 @@ export interface BeatView {
   hero: string;
   layout: Layout;
   entrance: Entrance;
+  /** Gesture that tells the line, picked when the script was split ("none" on older videos). */
+  move: Move;
   image: string | null;
   candidates: string[];
   accent: boolean;
@@ -109,6 +111,7 @@ export async function videoView(row: VideoRow): Promise<VideoView> {
       hero: b.hero,
       layout: b.layout,
       entrance: b.entrance,
+      move: b.move ?? "none",
       image: b.image,
       candidates: b.candidates,
       accent: b.accent,

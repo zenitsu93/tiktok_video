@@ -1,6 +1,6 @@
 "use client";
 
-import { ENTRANCE_LABELS, ENTRANCES, LAYOUT_LABELS, LAYOUTS, type BeatPatch } from "@regie/core";
+import { ENTRANCE_LABELS, ENTRANCES, LAYOUT_LABELS, LAYOUTS, MOVE_LABELS, MOVES, type BeatPatch } from "@regie/core";
 import { ArrowLeft, Download, Hand, Image as ImageIcon, ImagePlus, LayoutGrid, List, Loader2, Maximize2, Mic, Minimize2, Pause, Play, RotateCcw, Scissors, Send, Sparkles, Undo2, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -950,6 +950,17 @@ function Inspector({
           {ENTRANCES.map((en) => (
             <button key={en} className="pick" aria-pressed={b.entrance === en} onClick={() => patch({ entrance: en })}>
               {ENTRANCE_LABELS[en]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grp">
+        <span className="lab" title="Choisi tout seul d'après la phrase ; à changer seulement si le choix ne te plaît pas">Geste</span>
+        <div className="chips">
+          {MOVES.map((m) => (
+            <button key={m} className="pick" aria-pressed={b.move === m} onClick={() => patch({ move: m })}>
+              {MOVE_LABELS[m]}
             </button>
           ))}
         </div>

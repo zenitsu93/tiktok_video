@@ -1,6 +1,7 @@
 import { applyBeatPatch, beatContext, FPS, spokenText, timeBeats, voiceStale, type Asset, type Beat, type VideoDoc } from "@regie/core";
 import { createTikTokSend, getAsset, getDb, getVideo, lastTikTokSend, mutateDoc, pronunciationLexicon, setBusy, setError, setProgress, setRendered, setStatus, tiktokSendInFlight } from "@regie/db";
 import { BudgetError, enqueue, env, JOBS, providers, storage, tiktokConfigured, tiktokConnected } from "@regie/server";
+import { randomInt } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import pLimit from "p-limit";
@@ -234,9 +235,13 @@ export async function generate(videoId: string) {
       return;
     }
     await setProgress(db(), videoId, { step: "Découpage en plans", done: 0, total: 1 });
-    const rows = claude ? await splitScript(videoId, script) : script === demo!.beats.map((b) => b.text).join(" ") ? demo!.beats : demoSplit(script);
-    beats = toBeats(rows);
-    await mutateDoc(db(), videoId, "script", (d) => ({ ...d, beats, sources, draft: null }));
+    const split = claude
+      ? await splitScript(videoId, script)
+      : { beats: script === demo!.beats.map((b) => b.text).join(" ") ? demo!.beats : demoSplit(script), mood: "lumineux" as const };
+    // the video's own draw: where the entrances start, which lines stress how, black and white for a dark story
+    const look = { seed: randomInt(1_000_000), mono: split.mood === "sombre" };
+    beats = toBeats(split.beats, look.seed);
+    await mutateDoc(db(), videoId, "script", (d) => ({ ...d, beats, look, sources, draft: null }));
   }
 
   // voice: the whole script in one take when nothing is voiced yet
