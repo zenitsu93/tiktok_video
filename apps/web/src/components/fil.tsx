@@ -382,9 +382,21 @@ export function Fil({ initial }: { initial: VideoView }) {
               <Undo2 size={15} /> Annuler
             </button>
             {upToDate && v.download ? (
-              <a className="btn primary sm" href={v.download} download>
-                <Download size={15} /> Télécharger MP4
-              </a>
+              <>
+                <a className="btn primary sm" href={v.download} download>
+                  <Download size={15} /> Télécharger MP4
+                </a>
+                {/* nothing changed, but the export itself can improve (voice level…): the shots come from the cache, only the mix is redone */}
+                <button
+                  className="btn ghost sm"
+                  disabled={!canRender}
+                  onClick={() => run(() => call(`${url}/render`, "POST"), "Export relancé avec les derniers réglages")}
+                  title="Refaire l'export avec les derniers réglages (niveau de la voix…). Les plans ne sont pas re-rendus."
+                  aria-label="Refaire l'export"
+                >
+                  <RotateCcw size={15} />
+                </button>
+              </>
             ) : (
               <button
                 className="btn primary sm"
