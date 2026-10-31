@@ -12,6 +12,7 @@ import {
   snapshotStyle,
   spokenText,
   textRuns,
+  textWords,
   timeBeats,
   voiceStale,
   type ComposeContext,
@@ -141,6 +142,15 @@ describe("text runs", () => {
     const short = textRuns({ ...beat, text: "C'est la cicatrice", hero: "cicatrice" }, false);
     expect(short.rows[0]!.map((r) => r.cls)).toEqual(["light", "hero"]);
   });
+
+  it("keeps the French space marks and the quotes with the hero, never alone on a row", () => {
+    const colon = textRuns({ ...beat, text: "Il l'appelle Earth Song : un cri", hero: "Earth Song", place: "hero" }, false);
+    expect(colon.rows.flat().map((r) => r.text)).toEqual(["Il l'appelle", "Earth Song\u00a0:", "un cri"]);
+    const quoted = textRuns({ ...beat, text: "Il hurle « What About Us »", hero: "What About Us", place: "hero" }, false);
+    expect(quoted.rows.flat().map((r) => r.text)).toEqual(["Il hurle", "«\u00a0What About Us\u00a0»"]);
+    const straight = textRuns({ ...beat, text: 'Il hurle "What About Us" !', hero: "What About Us", place: "size" }, false);
+    expect(straight.rows.flat().map((r) => r.text)).toEqual(["Il hurle", '"What About Us"\u00a0!']);
+  });
 });
 
 describe("edits", () => {
@@ -244,5 +254,13 @@ describe("styles", () => {
     expect(back.beats.map((b) => [b.entrance, b.place ?? null])).toEqual(first.beats.map((b) => [b.entrance, b.place ?? null]));
     expect(back.beats.map((b) => b.text)).toEqual(first.beats.map((b) => b.text));
     expect(() => applyStyle(second, 4)).toThrow("Ce style n'existe pas.");
+  });
+});
+
+describe("textWords", () => {
+  it("glues every mark to its word, so none can stand alone on a line", () => {
+    expect(textWords("Il l'appelle Earth Song : un cri ?")).toEqual(["Il", "l'appelle", "Earth", "Song :", "un", "cri ?"]);
+    expect(textWords("Il hurle « What About Us »")).toEqual(["Il", "hurle", "« What", "About", "Us »"]);
+    expect(textWords('Il dit " non " puis')).toEqual(["Il", "dit", '" non "', "puis"]);
   });
 });

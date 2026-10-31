@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balanceRows, drawStyle, pickMoves, pickPlaces, readingOf, restyleBeats, takeCuts, toBeats, type Row } from "../src/beats";
+import { balanceRows, drawStyle, pickMoves, pickPlaces, readingOf, restyleBeats, takeCuts, tidyRows, toBeats, type Row } from "../src/beats";
 
 const text = (t: string, hero = ""): Row => ({ text: t, hero, layout: "text", imageQuery: { kind: "none", queries: [] } });
 const card = (t: string, q: string): Row => ({ text: t, hero: "", layout: "card", imageQuery: { kind: "pinterest", queries: [q] } });
@@ -159,5 +159,37 @@ describe("remonter autrement", () => {
     const reading = readingOf(rows, "sombre");
     expect(reading.moves[beats[3]!.id]).toBe("fullscreen");
     expect(restyleBeats(beats, reading, 7)[3]!.move).toBe("fullscreen");
+  });
+});
+
+describe("tidyRows", () => {
+  it("puts a mark cut off at the start of a line back on the line before", () => {
+    const rows = tidyRows([card("Il l'appelle Earth Song", "a"), card(": un cri pour la planète.", "a")]);
+    expect(rows.map((r) => r.text)).toEqual(["Il l'appelle Earth Song :", "un cri pour la planète."]);
+  });
+
+  it("drops a line that was only a mark", () => {
+    const rows = tidyRows([card("Il écrit", "a"), text(":"), card("une seule question", "b")]);
+    expect(rows.map((r) => r.text)).toEqual(["Il écrit :", "une seule question"]);
+  });
+
+  it("moves an opening quote to the line it opens", () => {
+    const rows = tidyRows([card("Il hurle «", "a"), card("What About Us ? »", "b")]);
+    expect(rows.map((r) => r.text)).toEqual(["Il hurle", "« What About Us ? »"]);
+  });
+
+  it("puts a short quote cut in two back together", () => {
+    const rows = tidyRows([card("Il hurle « What About", "a"), card("Us ? »", "b")]);
+    expect(rows.map((r) => r.text)).toEqual(["Il hurle « What About Us ? »"]);
+  });
+
+  it("closes and reopens a long quote on each of its lines", () => {
+    const rows = tidyRows([card("Il chante « Et nous, que reste-t-il,", "a"), card("de la terre qu'on a brûlée ? »", "b")]);
+    expect(rows.map((r) => r.text)).toEqual(["Il chante « Et nous, que reste-t-il »,", "« de la terre qu'on a brûlée ? »"]);
+  });
+
+  it("closes a quote Claude forgot to close, and leaves paired quotes alone", () => {
+    expect(tidyRows([card("Le refrain « What About Us.", "a")])[0]!.text).toBe("Le refrain « What About Us ».");
+    expect(tidyRows([card('Il dit "non" puis part.', "a")])[0]!.text).toBe('Il dit "non" puis part.');
   });
 });

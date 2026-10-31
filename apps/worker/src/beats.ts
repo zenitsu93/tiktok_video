@@ -1,4 +1,4 @@
-import { ENTRANCES, FPS, type Beat, type BeatStyle, type Entrance, type Move, type Place, type Reading, type VideoDoc, type Zone } from "@regie/core";
+import { closeQuote, ENTRANCES, FPS, openQuote, quoteBalance, type Beat, type BeatStyle, type Entrance, type Move, type Place, type Reading, type VideoDoc, type Zone } from "@regie/core";
 
 /** One passage as the split returns it. */
 export interface Row {
@@ -15,6 +15,68 @@ const NO_IMAGE: Beat["imageQuery"] = { kind: "none", queries: [] };
 const imageless = (r: Row) => r.layout === "text" || r.layout === "kinetic";
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 
+/** Marks that close what comes before them: they never start a line. */
+const LEAD = /^\s*([,.;:?!…»”’)]+)\s*/;
+/** Marks that open what comes after them: they never end a line. */
+const TAIL = /\s*([«“‘(]+)\s*$/;
+/** Marks French writes after a space (« dit : », « vrai ? », « titre » »). */
+const SPACED = /^[;:?!»]/;
+
+const wordCount = (rows: Row[]) => rows.reduce((n, r) => n + words(r.text), 0);
+
+/**
+ * Safety net for the punctuation, whatever the split returned: a mark cut off at the start of a
+ * line goes back to the end of the one before (« … Earth Song » + « : un cri » → « … Earth Song : » +
+ * « un cri »), an opening quote at the end of a line moves to the next one, and every line keeps
+ * its quotes paired. A quote cut in two is put back together when that stays one short screen;
+ * otherwise each half is closed and reopened on its own line. A quote Claude forgot to close is closed.
+ */
+export function tidyRows(input: Row[]): Row[] {
+  const rows = input.map((r) => ({ ...r, text: r.text.trim() }));
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]!;
+    const prev = rows[i - 1];
+    const lead = LEAD.exec(row.text);
+    if (lead && prev) {
+      prev.text = `${prev.text}${SPACED.test(lead[1]!) ? " " : ""}${lead[1]}`;
+      row.text = row.text.slice(lead[0].length);
+    }
+    const next = rows[i + 1];
+    const tail = TAIL.exec(row.text);
+    if (tail && next) {
+      next.text = `${tail[1]}${tail[1]!.endsWith("«") ? " " : ""}${next.text}`;
+      row.text = row.text.slice(0, row.text.length - tail[0].length);
+    }
+  }
+  const kept = rows.filter((r) => r.text.trim());
+  const out: Row[] = [];
+  for (let i = 0; i < kept.length; i++) {
+    let row = kept[i]!;
+    for (const q of quoteBalance(row.text)) {
+      if (q.balance <= 0) continue;
+      const next = kept[i + 1];
+      const closes = next && quoteBalance(next.text).find((n) => n.open === q.open)!.balance < 0;
+      if (closes && next && wordCount([row, next]) <= (row.layout === "kinetic" || next.layout === "kinetic" ? 14 : 8)) {
+        // one short screen holds the whole quote
+        row = {
+          ...row,
+          text: `${row.text} ${next.text}`,
+          hero: row.hero || next.hero,
+          italic: Boolean(row.italic || next.italic),
+          move: row.move && row.move !== "none" ? row.move : next.move,
+        };
+        i++;
+      } else {
+        row = { ...row, text: closeQuote(row.text, q.close) };
+        if (closes && next) kept[i + 1] = { ...next, text: openQuote(next.text, q.open) };
+      }
+    }
+    for (const q of quoteBalance(row.text)) if (q.balance < 0) row = { ...row, text: openQuote(row.text, q.open) };
+    out.push(row);
+  }
+  return out;
+}
+
 /**
  * Safety net for the rhythm, whatever the split returned: two imageless passages of
  * one sentence become one (a wall of text loses the viewer), a long imageless line
@@ -22,7 +84,7 @@ const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
  */
 export function balanceRows(rows: Row[]): Row[] {
   const joined: Row[] = [];
-  for (const row of rows) {
+  for (const row of tidyRows(rows)) {
     const prev = joined.at(-1);
     if (prev && imageless(prev) && imageless(row) && !/[.?!…»"]$/.test(prev.text.trim())) {
       joined[joined.length - 1] = {

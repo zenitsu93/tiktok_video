@@ -42,6 +42,7 @@ export const SPLIT_SYSTEM = `Tu découpes un script de voix off TikTok en passag
 
 Règles :
 - Un passage = 2 à 6 mots dits d'un souffle, une idée à l'écran. Coupe aux virgules et aux points. Seule exception, le bloc cinétique (plus bas), qui garde sa phrase entière. Le texte des passages mis bout à bout doit redonner le script mot pour mot.
+- Ponctuation : ne coupe jamais à l'intérieur d'une citation ou d'un titre entre guillemets, le passage garde ses deux guillemets (« What About Us »). Un signe (« : », « ; », « ? », « ! », « » ») reste à la fin du passage du mot qui le précède, jamais au début du suivant ; un « « » ouvrant va avec le mot qui le suit.
 - hero : le seul mot (ou groupe court) qui porte l'émotion ou l'info (chiffre, nom propre, adjectif fort), recopié exactement tel qu'il apparaît dans le passage. Chaîne vide quand aucun mot ne s'impose ou pour une phrase de liaison.
 - layout :
   - "vinyl" pour l'accroche (« Tu connais l'histoire de … ») et la toute dernière phrase, qui bouclent sur le vinyle ;
