@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { missingImages, reachable, reading, rewriting, stepOf, STEPS, upToDate, voiceMissing } from "@/lib/steps";
 import type { BeatView, VideoView } from "@/lib/view";
 import { CopyCaption } from "./caption";
+import { CoverPicker } from "./cover-picker";
 import { DeleteVideo } from "./delete-video";
 import { Histoire, tooShort, type ScriptSend } from "./lecture";
 import { Planche } from "./planche";
@@ -1087,6 +1088,9 @@ function Inspector({
         </div>
       </div>
 
+      {b.layout === "vinyl" ? (
+        <CoverPicker v={v} notify={notify} />
+      ) : (
       <div
         className={`grp${drag ? " drop" : ""}`}
         onDragOver={(e) => {
@@ -1190,6 +1194,7 @@ function Inspector({
           {b.queries.length > 0 && <span className="mute" style={{ fontSize: 13, alignSelf: "center" }}>« {b.queries.join(" », « ")} »</span>}
         </div>
       </div>
+      )}
 
       {v.providers.claude && (
         <form

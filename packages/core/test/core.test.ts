@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  addCovers,
   applyBeatPatch,
+  chooseCover,
+  coverChoices,
   applyStyle,
   buildScenes,
   coverTitleSize,
@@ -262,5 +265,29 @@ describe("textWords", () => {
     expect(textWords("Il l'appelle Earth Song : un cri ?")).toEqual(["Il", "l'appelle", "Earth", "Song :", "un", "cri ?"]);
     expect(textWords("Il hurle « What About Us »")).toEqual(["Il", "hurle", "« What", "About", "Us »"]);
     expect(textWords('Il dit " non " puis')).toEqual(["Il", "dit", '" non "', "puis"]);
+  });
+});
+
+describe("pochette", () => {
+  const img = (id: string) => ({ id, kind: "image" as const, mime: "image/jpeg", width: 1000, height: 1000 });
+  const base = (): VideoDoc => {
+    const d = demoDoc();
+    const beats = d.beats.map((b, i) => (i === 3 ? { ...b, image: "old", candidates: ["old"] } : b));
+    return { ...d, cover: "old", beats, assets: { ...d.assets, old: img("old"), p1: img("p1"), p2: img("p2") } as VideoDoc["assets"] };
+  };
+  it("adds found sleeves to the choices without changing the cover", () => {
+    const d = addCovers(base(), ["p1", "p2"]);
+    expect(d.cover).toBe("old");
+    expect(coverChoices(d)).toEqual(["p1", "p2", "old"]);
+  });
+  it("puts the chosen sleeve on the video and on the lines that showed the old one", () => {
+    const d = chooseCover(addCovers(base(), ["p1"]), "p1");
+    expect(d.cover).toBe("p1");
+    expect(d.beats[3]!.image).toBe("p1");
+    expect(d.beats[3]!.candidates[0]).toBe("p1");
+    expect(addCovers(base(), ["p2"], true).cover).toBe("p2");
+  });
+  it("refuses an image that is not one of the sleeves", () => {
+    expect(() => chooseCover(base(), "p1")).toThrow(EditError);
   });
 });

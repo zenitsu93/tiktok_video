@@ -1,4 +1,4 @@
-import { applyBeatPatch, beatContext, FPS, snapshotStyle, spokenText, timeBeats, voiceStale, type Asset, type Beat, type Reading, type VideoDoc } from "@regie/core";
+import { addCovers, applyBeatPatch, beatContext, coverChoices, FPS, snapshotStyle, spokenText, timeBeats, voiceStale, type Asset, type Beat, type Reading, type VideoDoc } from "@regie/core";
 import { createTikTokSend, getAsset, getDb, getVideo, lastTikTokSend, mutateDoc, pronunciationLexicon, setBusy, setError, setProgress, setRendered, setStatus, tiktokSendInFlight } from "@regie/db";
 import { BudgetError, enqueue, env, JOBS, providers, storage, tiktokConfigured, tiktokConnected } from "@regie/server";
 import { randomInt } from "node:crypto";
@@ -11,7 +11,7 @@ import { animatedGif, ff, ingestClip, ingestImage, ingestVoice, sliceTake, store
 import { editBeat, readMoves, splitScript, writeCaption, writeScript } from "./providers/claude";
 import { demoCaption, demoImages, demoScript, demoSplit, demoVoice } from "./providers/demo";
 import { speak, speakTake } from "./providers/elevenlabs";
-import { deezerCover, fetchImage, SearchError, searchPinterest } from "./providers/images";
+import { deezerCover, deezerCovers, fetchImage, SearchError, searchPinterest } from "./providers/images";
 import { exportVideo, prerenderScenes } from "./render";
 
 const db = () => getDb();
@@ -209,9 +209,69 @@ async function coverFor(videoId: string) {
     const url = await deezerCover(doc.title, doc.artist);
     if (!url) return;
     const asset = await ingestImage(await fetchImage(url), url);
-    await mutateDoc(db(), videoId, "pochette", (d) => ({ ...d, cover: asset.id, assets: { ...d.assets, [asset.id]: asset } }));
+    await mutateDoc(db(), videoId, "pochette", (d) => addCovers({ ...d, assets: { ...d.assets, [asset.id]: asset } }, [asset.id], true));
   } catch (e) {
     console.warn("[cover]", (e as Error).message);
+  }
+}
+
+/** Words added to the Pinterest search for the cover, one more per click: another click brings other sleeves. */
+const COVER_SEARCHES = ["album cover", "single cover", "vinyl record sleeve", "original album art", "cd cover", "pochette"];
+
+/**
+ * « Changer la pochette », on the record's line: other sleeves from Deezer (free) or from Pinterest
+ * (the same Apify search as the images), or the file Thomas brought (« Ma pochette »).
+ * Found sleeves join the choices; the video's cover changes only on Thomas's click, except his own file
+ * (and a video that had no cover yet), which goes on at once.
+ * The cover is the opening (the « bac à disques », which is also the TikTok cover), the record and the ending.
+ */
+export async function changeCover(videoId: string, source: "deezer" | "pinterest" | "upload", key?: string) {
+  await setBusy(db(), videoId, "cover", true);
+  try {
+    const { doc } = await load(videoId);
+    const known = new Set(Object.values(doc.assets).map((a) => a.source));
+    const added: Asset[] = [];
+    if (source === "upload") {
+      if (!key) throw new Error("Fichier introuvable.");
+      try {
+        added.push(await ingestImage(await storage().read(key), "moi:pochette"));
+      } finally {
+        await storage().remove(key).catch(() => {});
+      }
+    } else {
+      let urls: string[];
+      if (source === "deezer") urls = await deezerCovers(doc.title, doc.artist, known);
+      else {
+        if (!providers().images) throw new Error("La recherche Pinterest n'est pas branchée (clé Apify absente).");
+        // how many Pinterest sleeves this video already has picks the words: the same click never pays twice for the same pins
+        const pins = coverChoices(doc).filter((c) => doc.assets[c]?.source?.includes("pinimg")).length;
+        const words = COVER_SEARCHES[Math.floor(pins / 6) % COVER_SEARCHES.length];
+        urls = (await searchPinterest(videoId, `${doc.artist} ${doc.title} ${words}`, 6, known)).filter((u) => !known.has(u));
+      }
+      for (const url of [...new Set(urls)].slice(0, 6)) {
+        try {
+          added.push(await ingestImage(await fetchImage(url), url));
+        } catch (e) {
+          console.warn("[pochette] ignorée", url, (e as Error).message);
+        }
+      }
+    }
+    if (!added.length) {
+      await setError(
+        db(),
+        videoId,
+        source === "deezer"
+          ? "Deezer n'a pas d'autre pochette pour cette chanson. Essaie « Chercher sur Pinterest » ou « Ma pochette »."
+          : "Pas de nouvelle pochette sur Pinterest. Essaie encore (d'autres mots) ou « Ma pochette ».",
+      );
+      return;
+    }
+    await mutateDoc(db(), videoId, source === "upload" ? "ma pochette" : `pochettes ${source}`, (d) =>
+      addCovers({ ...d, assets: { ...d.assets, ...Object.fromEntries(added.map((a) => [a.id, a])) } }, added.map((a) => a.id), source === "upload" || !d.cover),
+    );
+  } finally {
+    await setBusy(db(), videoId, "cover", false);
+    await enqueue(JOBS.prerender, { videoId });
   }
 }
 

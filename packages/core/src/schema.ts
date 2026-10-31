@@ -178,6 +178,8 @@ export const videoDocSchema = z.object({
   angle: z.string().max(300),
   /** Album cover asset, used by vinyl beats. */
   cover: z.string().nullable(),
+  /** Every cover found or brought for this video (Deezer, Pinterest, « Ma pochette »), to pick another one. */
+  covers: z.array(z.string()).max(40).optional(),
   /** All voice clips mixed at their beat times (asset id), rebuilt after each voice change. */
   voiceTrack: z.string().nullable().default(null),
   beats: z.array(beatSchema).max(80),

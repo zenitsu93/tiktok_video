@@ -12,6 +12,8 @@ export const JOBS = {
   images: "beat-images",
   /** An image Thomas brought himself, for one beat. */
   upload: "beat-upload",
+  /** Other album covers (Deezer or Pinterest), or the cover Thomas brought, for the opening and the ending. */
+  cover: "video-cover",
   /** Cut the background out of one beat's image. */
   clean: "beat-clean",
   /** Rewrite the whole script with Claude, before it is approved. */
@@ -38,6 +40,7 @@ export const jobData = {
   [JOBS.images]: z.object({ videoId: z.string().uuid(), beatId: z.string(), instruction: z.string().max(500).optional() }),
   [JOBS.clean]: z.object({ videoId: z.string().uuid(), beatId: z.string() }),
   [JOBS.upload]: z.object({ videoId: z.string().uuid(), beatId: z.string(), key: z.string().regex(/^uploads\/[0-9a-f-]{36}$/), also: z.array(z.string()).max(40).optional(), mime: z.string().max(40).optional() }),
+  [JOBS.cover]: z.object({ videoId: z.string().uuid(), source: z.enum(["deezer", "pinterest", "upload"]), key: z.string().regex(/^uploads\/[0-9a-f-]{36}$/).optional() }),
   [JOBS.script]: z.object({ videoId: z.string().uuid(), instruction: z.string().min(1).max(1000) }),
   [JOBS.rewrite]: z.object({ videoId: z.string().uuid(), beatId: z.string(), instruction: z.string().min(1).max(500) }),
   [JOBS.render]: z.object({ videoId: z.string().uuid(), send: z.boolean().optional() }),

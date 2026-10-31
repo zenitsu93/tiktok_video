@@ -36,6 +36,7 @@ const video = (over: Partial<VideoView> = {}): VideoView => ({
   beats: [beat("b01"), beat("b02")],
   images: {},
   cover: null,
+  covers: [],
   sources: [],
   manualImages: false,
   draft: null,

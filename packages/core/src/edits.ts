@@ -30,6 +30,37 @@ export function applyBeatPatch(doc: VideoDoc, beatId: string, patch: BeatPatch):
   return { doc: { ...doc, beats }, voiceChanged: before.text !== next.text };
 }
 
+/** The covers a video can pick from: every one found or brought, the one in use first if the list predates it. */
+export function coverChoices(doc: VideoDoc): string[] {
+  const list = doc.covers ?? [];
+  return doc.cover && !list.includes(doc.cover) ? [doc.cover, ...list] : list;
+}
+
+/**
+ * Adds covers to a video's choices (newest first). `select` puts the first one on the video:
+ * the opening, the record and the ending all read `doc.cover`.
+ */
+export function addCovers(doc: VideoDoc, ids: string[], select = false): VideoDoc {
+  const covers = [...ids, ...coverChoices(doc).filter((c) => !ids.includes(c))].slice(0, 40);
+  const next = { ...doc, covers };
+  return select && ids[0] ? chooseCover(next, ids[0]) : next;
+}
+
+/**
+ * Puts another cover on the video. The lines that showed the old cover in a card
+ * (an idea « the album cover ») follow it, so the video never shows two different sleeves.
+ */
+export function chooseCover(doc: VideoDoc, id: string): VideoDoc {
+  const choices = coverChoices(doc);
+  if (!choices.includes(id) || !doc.assets[id]) throw new EditError("Cette image n'est pas parmi les pochettes de la vidéo.");
+  const old = doc.cover;
+  if (old === id) return { ...doc, covers: choices };
+  const beats = doc.beats.map((b) =>
+    old && b.image === old ? { ...b, image: id, candidates: [id, ...b.candidates.filter((c) => c !== id)].slice(0, 24) } : b,
+  );
+  return { ...doc, cover: id, covers: choices, beats };
+}
+
 /**
  * The sentence as the voice must read it: each word of the pronunciation lexicon
  * (whole word, any case) becomes how to say it. The screen keeps the sentence as written.

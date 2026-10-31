@@ -174,3 +174,27 @@ export async function deezerCover(title: string, artist: string): Promise<string
   }
   return null;
 }
+
+/**
+ * « Autres pochettes »: the other sleeves Deezer knows for the song (single, album, reissues,
+ * compilations), then the artist's albums. Free, no key. In Deezer's order, without duplicates.
+ */
+export async function deezerCovers(title: string, artist: string, skip: Set<string | undefined>, want = 6): Promise<string[]> {
+  const out: string[] = [];
+  for (const q of [`artist:"${artist}" track:"${title}"`, `${artist} ${title}`, `artist:"${artist}"`]) {
+    if (out.length >= want) break;
+    try {
+      const res = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=50`, { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) continue;
+      const body = (await res.json()) as { data?: { album?: { cover_xl?: string } }[] };
+      for (const item of body.data ?? []) {
+        const url = item.album?.cover_xl;
+        if (url && allowedImageUrl(url) && !skip.has(url) && !out.includes(url)) out.push(url);
+        if (out.length >= want) break;
+      }
+    } catch (e) {
+      console.warn("[pochette] Deezer :", (e as Error).message);
+    }
+  }
+  return out;
+}
