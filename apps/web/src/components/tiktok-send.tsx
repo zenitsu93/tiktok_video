@@ -159,7 +159,7 @@ export function TikTokTab({
           <li>Ouvre la notification « Boîte de réception »</li>
           <li>Ajoute le son de la chanson, volume 10 à 20 %</li>
           <li>Colle la légende (bouton « Copier » au-dessus)</li>
-          <li>Publie</li>
+          <li>Publie, puis « Je l&apos;ai publiée » ici, en bas</li>
         </ol>
       </section>
       {children}

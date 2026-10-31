@@ -7,7 +7,7 @@ export const STEPS = [
   { title: "Images", sub: "Pinterest ou à la main" },
   { title: "Montage", sub: "aperçu, retouches" },
   { title: "Fichier", sub: "MP4" },
-  { title: "TikTok", sub: "envoi, légende" },
+  { title: "TikTok", sub: "envoi, publication" },
 ] as const;
 
 /** Who has the hand on the current step: the Régie at work, Thomas, done, or stopped by an error. */
@@ -52,7 +52,8 @@ export function stepOf(v: VideoView): { step: number; who: Who } {
       if (v.busy.includes("restyle")) return { step: 3, who: "run" };
       if (!v.download) return { step: v.manualImages && missingImages(v).length > 0 ? 2 : 3, who: "you" };
       if (!upToDate(v)) return { step: 3, who: "you" };
-      return v.tiktok.send?.current && v.tiktok.send.status === "inbox" ? { step: 5, who: "done" } : { step: 5, who: "you" };
+      // done only once Thomas ticked « Publiée »: TikTok's inbox is not the feed
+      return { step: 5, who: v.publishedAt ? "done" : "you" };
   }
 }
 

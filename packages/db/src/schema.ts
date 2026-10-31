@@ -28,6 +28,10 @@ export const videos = pgTable(
     /** Beats a job is working on right now, shown as a spinner on the line. */
     busyBeats: jsonb("busy_beats").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
     error: text("error"),
+    /** Last time the MP4 was downloaded from the Régie. */
+    downloadedAt: timestamp("downloaded_at", { withTimezone: true }),
+    /** Ticked by Thomas once the video is out on TikTok, whichever way it went there. */
+    publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

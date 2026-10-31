@@ -62,6 +62,7 @@ function Divider({ width, onResize }: { width: number; onResize: (w: number) => 
 }
 
 const tc = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
+const day = (iso: string) => new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" }).format(new Date(iso));
 const usd = (n: number) => `${n.toFixed(n < 1 ? 3 : 2)} $`;
 
 /**
@@ -431,6 +432,10 @@ export function Fil({ initial }: { initial: VideoView }) {
   const render = () =>
     run(() => call(`${url}/render`, "POST", { send: false }), v.download ? "Seuls les plans modifiés repassent au rendu" : "Fabrication du MP4");
   const again = () => run(() => call(`${url}/render`, "POST"), "Fichier refait : il repart sur TikTok tout seul");
+  const publish = (on: boolean) =>
+    run(() => call(`${url}/published`, "POST", { published: on }).then(refresh), on ? "Rangée dans « Publiées »" : "Remise dans « À publier »");
+  // the home screen asks later whether a downloaded MP4 went online
+  const downloaded = () => void fetch(`${url}/downloaded`, { method: "POST" }).catch(() => {});
   const queued = () => {
     setEager(Date.now() + 15_000);
     void refresh();
@@ -737,38 +742,62 @@ export function Fil({ initial }: { initial: VideoView }) {
     );
   } else {
     const tiktok = v.tiktok.configured && v.tiktok.connected;
-    msg =
-      who === "done" ? (
+    const inInbox = v.tiktok.send?.current && v.tiktok.send.status === "inbox";
+    const tick = (
+      <button className={`btn${inInbox || !v.download ? " primary lg" : ""}`} onClick={() => publish(true)} title="Coche quand la vidéo est en ligne sur TikTok : elle passe dans « Publiées »">
+        <Check size={15} /> Je l&apos;ai publiée
+      </button>
+    );
+    if (who === "done") {
+      msg = (
         <span>
-          <b>Dans ta boîte TikTok.</b> Il reste le son et la légende, dans l&apos;app.
+          <b>Publiée le {day(v.publishedAt!)}.</b> Rangée dans « Publiées ».
         </span>
-      ) : (
+      );
+      acts = (
+        <>
+          <button className="btn ghost" onClick={() => publish(false)} title="Pas encore en ligne : la remettre dans « À publier »">
+            Décocher
+          </button>
+          <Link className="btn dark lg" href="/">
+            Vidéo suivante
+          </Link>
+        </>
+      );
+    } else if (inInbox) {
+      msg = (
+        <span>
+          <b>Dans ta boîte TikTok.</b> Ajoute le son et la légende, publie, puis coche-la ici.
+        </span>
+      );
+      acts = (
+        <>
+          {v.caption && <CopyCaption text={v.caption} label="Copier la légende" />}
+          {tick}
+        </>
+      );
+    } else {
+      msg = (
         <>
           <span className="chip ok">
             <span className="dot" />
             MP4 à jour
           </span>
-          <span>Télécharge-le ou envoie-le sur TikTok.</span>
+          <span>Télécharge-le ou envoie-le sur TikTok ; une fois en ligne, coche-la.</span>
         </>
       );
-    acts =
-      who === "done" ? (
-        <>
-          {v.caption && <CopyCaption text={v.caption} label="Copier la légende" />}
-          <Link className="btn dark lg" href="/">
-            Vidéo suivante
-          </Link>
-        </>
-      ) : (
+      acts = (
         <>
           {v.download && (
-            <a className={`btn${tiktok ? "" : " primary lg"}`} href={v.download} download title="Le fichier de la vidéo, telle que dans l'aperçu">
+            <a className={`btn${tiktok ? "" : " primary lg"}`} href={v.download} download onClick={downloaded} title="Le fichier de la vidéo, telle que dans l'aperçu">
               <Download size={15} /> Télécharger
             </a>
           )}
           <SendToTikTok v={v} onQueued={queued} flash={flash} big />
+          {tick}
         </>
       );
+    }
   }
 
   return (

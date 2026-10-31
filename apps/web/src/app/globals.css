@@ -488,6 +488,20 @@ kbd { font-family: var(--mono); font-size: 11.5px; border: 1px solid var(--line)
   .home { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "launch" "queue"; }
   .home .launch { border-right: 0; border-bottom: 1px solid var(--line); padding: 20px 18px 28px; }
   .queue { padding: 18px 14px 50px; }
-  .qrow a { grid-template-columns: minmax(0, 1fr) auto; }
+  .qrow a { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .qrow a .chip { justify-self: start; }
   .qrow .mp { display: none; }
 }
+
+/* « Le tampon »: tick a video once it is out on TikTok; it moves to « Publiées », folded at the bottom */
+.pubbox { flex: none; width: 32px; height: 32px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--paper); display: grid; place-items: center; cursor: pointer; color: transparent; transition: background .2s, border-color .2s, color .2s; }
+.pubbox:hover:not(:disabled) { border-color: var(--ok); color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.pubbox.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+.pubbox svg { stroke-dasharray: 24; stroke-dashoffset: 24; transition: stroke-dashoffset .3s .05s; }
+.pubbox.on svg, .pubbox:hover svg { stroke-dashoffset: 0; }
+.qrow.pub { opacity: .78; }
+.qrow.pub .t { text-decoration: line-through; text-decoration-color: var(--mute); text-decoration-thickness: 1px; }
+.qgrp.fold > summary { font-size: 12px; padding: 4px 0; }
+.qgrp.fold[open] > summary { margin-bottom: 4px; }
+.pubask { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 12px; padding: 10px 12px; font-size: 15px; }
+.pubask b { font-weight: 500; }

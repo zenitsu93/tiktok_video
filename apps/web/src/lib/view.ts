@@ -58,6 +58,9 @@ export interface VideoView {
   busy: string[];
   dirty: string[];
   download: string | null;
+  /** When the MP4 was last downloaded, and when Thomas ticked « Publiée » (ISO dates). */
+  downloadedAt: string | null;
+  publishedAt: string | null;
   preview: string;
   costs: { provider: string; operation: string; calls: number; cost: number }[];
   spent: number;
@@ -140,6 +143,8 @@ export async function videoView(row: VideoRow): Promise<VideoView> {
     busy: row.busyBeats,
     dirty: row.renderAsset && doc.beats.length ? dirtyBeats(doc, row.renderedScenes) : [],
     download: row.renderAsset ? `${signMedia(row.renderAsset, 6 * 3600)}&dl=${slug(`${row.artist}-${row.title}`)}` : null,
+    downloadedAt: row.downloadedAt?.toISOString() ?? null,
+    publishedAt: row.publishedAt?.toISOString() ?? null,
     preview: `/api/videos/${row.id}/preview?v=${row.version}`,
     costs,
     spent: costs.reduce((s, c) => s + c.cost, 0),
