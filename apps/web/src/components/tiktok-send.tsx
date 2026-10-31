@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, RotateCcw, Send } from "lucide-react";
+import { Check, RotateCcw, Send, X } from "lucide-react";
 import { useState } from "react";
 import type { VideoView } from "@/lib/view";
 import { Caption } from "./caption";
@@ -31,6 +31,8 @@ function sendState(v: VideoView, pending: boolean) {
  */
 export function SendToTikTok({ v, onQueued, flash, big }: { v: VideoView; onQueued: () => void; flash: (text: string, err?: boolean) => void; big?: boolean }) {
   const [pending, setPending] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const { configured, connected } = v.tiktok;
   if (!configured) return null;
   if (!connected) {
@@ -58,6 +60,23 @@ export function SendToTikTok({ v, onQueued, flash, big }: { v: VideoView; onQueu
       setPending(false);
     }
   }
+  async function cancel() {
+    setCancelling(true);
+    try {
+      const r = await fetch(`/api/videos/${v.id}/tiktok`, { method: "DELETE" });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error ?? `Erreur ${r.status}`);
+      flash(stage === "processing" ? "Envoi annulé. Regarde ta boîte TikTok avant de renvoyer." : "Envoi annulé. Tu peux la renvoyer.");
+      setAsking(false);
+      onQueued();
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "Annulation impossible", true);
+    } finally {
+      setCancelling(false);
+    }
+  }
+  // a send already on its line (not the click being queued) can be stopped
+  const stoppable = moving && !pending;
   return (
     <>
       {(moving || sent || unconfirmed) && (
@@ -67,6 +86,22 @@ export function SendToTikTok({ v, onQueued, flash, big }: { v: VideoView; onQueu
               {st === "done" && <Check size={12} />} {label}
             </i>
           ))}
+          {stoppable && !asking && (
+            <button type="button" className="send-cancel" onClick={() => setAsking(true)} title="Arrêter cet envoi et revenir à « Envoyer sur TikTok »">
+              <X size={12} /> Annuler l&apos;envoi
+            </button>
+          )}
+        </span>
+      )}
+      {stoppable && asking && (
+        <span className="send-cancel-ask" role="group" aria-label="Confirmer l'annulation">
+          <span>{stage === "processing" ? "Le fichier est déjà chez TikTok : il peut quand même arriver dans ta boîte." : "L'envoi s'arrête ici."}</span>
+          <button type="button" className="btn sm danger" disabled={cancelling} onClick={cancel}>
+            {cancelling ? <Disc size={13} /> : <X size={13} />} Oui, annuler
+          </button>
+          <button type="button" className="btn sm ghost" disabled={cancelling} onClick={() => setAsking(false)}>
+            Non
+          </button>
         </span>
       )}
       <button

@@ -317,6 +317,13 @@ body.resizing iframe { pointer-events: none; }
 .publish-steps i.on { background: var(--ink); color: var(--paper); }
 .publish-steps i.done { color: var(--ok); }
 @keyframes tt-fill2 { to { width: 95%; } }
+/* « Annuler l'envoi »: a quiet link beside the steps, then a confirmation that slides in */
+.send-cancel { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--mute); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.send-cancel:hover, .send-cancel:focus-visible { color: var(--accent); }
+.send-cancel-ask { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 10px; font-size: 13px; animation: rise 0.2s ease-out; }
+.send-cancel-ask > span { max-width: 34ch; }
+.btn.danger { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (prefers-reduced-motion: reduce) { .send-cancel-ask { animation: none; } }
 
 /* public legal pages (asked for by the TikTok developer portal) */
 .legal { max-width: 680px; margin: 0 auto; padding: max(28px, env(safe-area-inset-top)) 18px 60px; display: flex; flex-direction: column; gap: 14px; font-size: 17px; }
