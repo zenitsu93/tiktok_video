@@ -25,6 +25,7 @@ export async function listVideos(db: Db, limit = 30) {
       title: videos.title,
       artist: videos.artist,
       status: videos.status,
+      progress: videos.progress,
       updatedAt: videos.updatedAt,
       renderAsset: videos.renderAsset,
       caption: sql<string | null>`${videos.doc}->>'caption'`,

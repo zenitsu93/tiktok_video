@@ -1,158 +1,165 @@
 "use client";
 
-import { ArrowLeft, Check, Wand2 } from "lucide-react";
-import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { Wand2 } from "lucide-react";
+import { useState } from "react";
+import { reading, rewriting } from "@/lib/steps";
 import type { VideoView } from "@/lib/view";
-import { DeleteVideo } from "./delete-video";
-import { StatusChip } from "./status";
 import { Disc } from "./waits";
 
 /** Spoken French in Thomas's videos runs at about 2.6 words a second. */
 const WPS = 2.6;
-const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+export const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+export const tooShort = (s: string) => s.trim().length < 80;
+
+export type ScriptSend = (payload: { action: "save" | "approve" | "rewrite"; draft: string; instruction?: string }, ok: string) => Promise<void>;
+
+function Sources({ v, open }: { v: VideoView; open?: boolean }) {
+  if (!v.sources.length) return null;
+  return (
+    <details className="panel" open={open}>
+      <summary>Sources du script ({v.sources.length})</summary>
+      <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 13 }}>
+        {v.sources.map((s) => (
+          <li key={s} style={{ overflowWrap: "anywhere" }}>
+            {/^https?:\/\//.test(s) ? (
+              <a href={s} target="_blank" rel="noopener noreferrer nofollow">
+                {s}
+              </a>
+            ) : (
+              s
+            )}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
 
 /**
- * The reading step: the script as one text, before anything paid is spent.
- * Thomas corrects it by hand or asks Claude for a rewrite, then approves it,
- * which starts the shots, the voice and the images.
+ * The Histoire tab: the script as one text, at every moment. While it waits for approval
+ * Thomas corrects it by hand or asks Claude for a rewrite (« Valider le script » is in the
+ * action bar); while Claude rewrites it, it stays readable. Once cut into shots it stays here
+ * as one text, each sentence marked as soon as its voice is ready.
  */
-export function Lecture({
-  v,
-  rewriting,
-  send,
-}: {
-  v: VideoView;
-  rewriting: boolean;
-  send: (payload: { action: "save" | "approve" | "rewrite"; draft: string; instruction?: string }, ok: string) => Promise<void>;
-}) {
-  const [text, setText] = useState(v.draft ?? "");
+export function Histoire({ v, text, setText, send, pending }: { v: VideoView; text: string; setText: (s: string) => void; send: ScriptSend; pending: boolean }) {
   const [ask, setAsk] = useState("");
-  const [pending, setPending] = useState(false);
-  const saved = useRef(v.draft ?? "");
 
-  // a rewrite came back: show Claude's new version
-  useEffect(() => {
-    if (v.draft !== null && v.draft !== saved.current) {
-      saved.current = v.draft;
-      setText(v.draft);
-    }
-  }, [v.draft]);
-
-  const n = words(text);
-  const secs = Math.round(n / WPS);
-  const tooShort = text.trim().length < 80;
-  const locked = rewriting || pending;
-
-  async function go(action: "save" | "approve" | "rewrite", ok: string) {
-    setPending(true);
-    try {
-      await send({ action, draft: text.trim(), ...(action === "rewrite" ? { instruction: ask.trim() } : {}) }, ok);
-      saved.current = text.trim();
-      if (action === "rewrite") setAsk("");
-    } finally {
-      setPending(false);
-    }
-  }
-
-  return (
-    <main className="lecture">
-      <header className="fil-head">
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Link href="/" className="btn ghost sm" aria-label="Retour aux vidéos">
-            <ArrowLeft size={16} />
-          </Link>
-          <h1 className="t">
-            {v.title} <span>· {v.artist}</span>
-          </h1>
-        </div>
-        <div className="meta">
-          <StatusChip status={v.status} />
-          {v.angle && <span className="chip">angle : {v.angle}</span>}
+  if (reading(v)) {
+    const busy = rewriting(v);
+    const locked = busy || pending;
+    const n = wordCount(text);
+    return (
+      <>
+        <div className="r" style={{ alignItems: "center" }}>
+          <span className="eyebrow">Ton script · modifiable</span>
           <span className="chip mono" title="Durée estimée de la voix off">
-            {n} mots · ~{secs} s
+            {n} mots · ~{Math.round(n / WPS)} s
           </span>
-          <span style={{ marginLeft: "auto" }} />
-          <DeleteVideo id={v.id} />
         </div>
-      </header>
-
-      <p className="mute" style={{ margin: 0, fontSize: 15 }}>
-        Relis l&apos;histoire avant qu&apos;on lance le reste. Tu peux corriger le texte directement ou demander une réécriture à Claude. Rien n&apos;est dépensé en voix ni en images tant que tu n&apos;as pas validé.
-      </p>
-
-      {v.error && (
-        <p className="chip hot" role="alert" style={{ whiteSpace: "normal", alignSelf: "flex-start", margin: 0 }}>
-          {v.error}
-        </p>
-      )}
-
-      <div className="lecture-page">
+        {busy && (
+          <div className="banner" role="status">
+            <Disc size={22} /> Claude réécrit le script. Le texte d&apos;avant reste lisible ici.
+          </div>
+        )}
+        {v.error && (
+          <p className="chip hot" role="alert" style={{ whiteSpace: "normal", alignSelf: "flex-start", margin: 0 }}>
+            {v.error}
+          </p>
+        )}
         <textarea
+          className="script-edit"
           aria-label="Script de la voix off"
           value={text}
           readOnly={locked}
           onChange={(e) => setText(e.target.value)}
           onBlur={() => {
-            if (!locked && !tooShort && text.trim() !== saved.current) void go("save", "Script enregistré");
+            if (!locked && !tooShort(text) && text.trim() !== (v.draft ?? "").trim()) void send({ action: "save", draft: text.trim() }, "Script enregistré");
           }}
         />
-        {rewriting && (
-          <div className="lecture-busy" role="status">
-            <Disc size={56} />
-            <span>Claude réécrit le script…</span>
+        <form
+          className="ask-bar"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!ask.trim() || locked) return;
+            void send({ action: "rewrite", draft: text.trim(), instruction: ask.trim() }, "Réécriture demandée").then(() => setAsk(""));
+          }}
+        >
+          <Wand2 size={15} className="mute" />
+          <input
+            value={ask}
+            onChange={(e) => setAsk(e.target.value)}
+            placeholder="Demander à Claude : « accroche plus choc », « raccourcis la fin »…"
+            maxLength={1000}
+            disabled={locked || !v.providers.claude}
+            aria-label="Consigne de réécriture"
+            title={v.providers.claude ? undefined : "Ajoute ta clé Claude pour demander une réécriture"}
+          />
+          <button className="btn dark sm" type="submit" disabled={locked || !ask.trim() || !v.providers.claude}>
+            Réécrire
+          </button>
+        </form>
+        <Sources v={v} />
+      </>
+    );
+  }
+
+  // after approval: the same text, cut into shots; each sentence turns green once its voice is there
+  if (v.beats.length) {
+    const voicing = v.status === "generating" && /voix/i.test(v.progress?.step ?? "");
+    return (
+      <>
+        {voicing && (
+          <div className="banner" role="status">
+            <span className="wave">
+              <i />
+              <i />
+              <i />
+              <i />
+              <i />
+            </span>
+            La voix se fait ({v.progress?.done ?? 0}/{v.progress?.total ?? v.beats.length}). Le texte reste là ; chaque phrase se souligne quand sa voix est prête.
           </div>
         )}
+        <p className="script-read">
+          {v.beats.map((b, i) => (
+            <span key={b.id}>
+              {i > 0 && " "}
+              <span className={voicing ? (b.voiceStale || v.busy.includes(b.id) ? "pend" : "said") : undefined}>{b.text}</span>
+            </span>
+          ))}
+        </p>
+        <p className="mute" style={{ margin: 0, fontSize: 14 }}>
+          Pour changer une phrase, clique-la dans l&apos;onglet Voix ou Montage : sa voix se refait toute seule.
+        </p>
+        <Sources v={v} />
+      </>
+    );
+  }
+
+  // approved, being cut into shots: the approved text, read-only
+  if (v.draft) {
+    return (
+      <>
+        <div className="banner" role="status">
+          <Disc size={22} /> Découpage en plans. Ton texte validé reste lisible ici.
+        </div>
+        <p className="script-read">{v.draft}</p>
+        <Sources v={v} />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="banner" role="status">
+        <Disc size={22} /> Claude cherche ses sources et écrit l&apos;histoire. Le texte s&apos;affiche ici dès qu&apos;il est prêt.
       </div>
-
-      <form
-        className="lecture-ask"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (ask.trim() && !locked) void go("rewrite", "Réécriture demandée");
-        }}
-      >
-        <input
-          className="field"
-          value={ask}
-          onChange={(e) => setAsk(e.target.value)}
-          placeholder="Demander à Claude : « accroche plus choc », « raccourcis la fin »…"
-          maxLength={1000}
-          disabled={locked || !v.providers.claude}
-          title={v.providers.claude ? undefined : "Ajoute ta clé Claude pour demander une réécriture"}
-        />
-        <button className="btn" type="submit" disabled={locked || !ask.trim() || !v.providers.claude}>
-          <Wand2 size={15} /> Réécrire
-        </button>
-      </form>
-
-      {v.sources.length > 0 && (
-        <details className="panel">
-          <summary>Sources du script ({v.sources.length})</summary>
-          <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 13 }}>
-            {v.sources.map((s) => (
-              <li key={s} style={{ overflowWrap: "anywhere" }}>
-                {/^https?:\/\//.test(s) ? (
-                  <a href={s} target="_blank" rel="noopener noreferrer nofollow">
-                    {s}
-                  </a>
-                ) : (
-                  s
-                )}
-              </li>
-            ))}
-          </ul>
-        </details>
+      {v.angle && (
+        <p className="mute" style={{ margin: 0 }}>
+          Angle : {v.angle}
+        </p>
       )}
-
-      <div className="lecture-go">
-        <button className="btn primary" disabled={locked || tooShort} onClick={() => void go("approve", "Script validé, on lance la suite")}>
-          <Check size={16} /> Valider le script
-        </button>
-        <span className="mute" style={{ fontSize: 13 }}>
-          Lance le découpage en plans, la voix et les images.
-        </span>
-      </div>
-    </main>
+      <Sources v={v} open />
+    </>
   );
 }
