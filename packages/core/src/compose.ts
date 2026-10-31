@@ -1,5 +1,6 @@
 import type { Asset, Beat, Entrance, Move, VideoDoc } from "./schema";
 import { FPS, round, timeBeats, toFrame, type TimedBeat } from "./timing";
+import { NBSP, textWords } from "./text";
 
 /**
  * Turns a video document into HyperFrames HTML, following the montage-tiktok-thomas skill.
@@ -198,30 +199,24 @@ function plainRuns(beat: Beat, spoken: boolean): { rows: Run[][]; heroOffset: nu
   const at = hero ? text.toLowerCase().indexOf(hero.toLowerCase()) : -1;
   if (spoken) {
     if (at < 0) return { rows: [[{ cls: "spoken", text }]], heroOffset: -1 };
-    const before = text.slice(0, at).trim();
-    let after = text.slice(at + hero.length);
-    const punct = /^[,.;:?!…]+/.exec(after)?.[0] ?? "";
-    after = after.slice(punct.length).trim();
+    const { before, heroText, after } = aroundHero(text, at, hero.length);
     const runs: Run[] = [];
     if (before) runs.push({ cls: "spoken", text: before });
-    runs.push({ cls: "spokenb", text: text.slice(at, at + hero.length) + punct });
+    runs.push({ cls: "spokenb", text: heroText });
     if (after) runs.push({ cls: "spoken", text: after });
     return { rows: [runs], heroOffset: at };
   }
   if (at < 0) return { rows: [[{ cls: "bold", text }]], heroOffset: -1 };
-  const before = text.slice(0, at).trim();
-  let after = text.slice(at + hero.length);
-  const punct = /^[,.;:?!…]+/.exec(after)?.[0] ?? "";
-  after = after.slice(punct.length).trim();
+  const { before, heroText, after } = aroundHero(text, at, hero.length);
   // small + big in one Regular weight, or one Regular line with the key word in Black: a single row
   if (beat.place === "size" || beat.place === "inline") {
     const runs: Run[] = [];
     if (before) runs.push({ cls: "small", text: before });
-    runs.push({ cls: beat.place === "size" ? "big" : "key", text: text.slice(at, at + hero.length) + punct });
+    runs.push({ cls: beat.place === "size" ? "big" : "key", text: heroText });
     if (after) runs.push({ cls: "small", text: after });
     return { rows: [runs], heroOffset: at };
   }
-  const heroRun: Run = { cls: "hero", text: text.slice(at, at + hero.length) + punct };
+  const heroRun: Run = { cls: "hero", text: heroText };
   const rows: Run[][] = [];
   const beforeWords = before ? before.split(/\s+/).length : 0;
   // One or two linking words share the hero's baseline; longer leads go on the line above.
@@ -234,11 +229,36 @@ function plainRuns(beat: Beat, spoken: boolean): { rows: Run[][]; heroOffset: nu
   return { rows, heroOffset: at };
 }
 
+/**
+ * The hero cut out of its line with the marks that belong to it: the quote that opens just before it,
+ * and the punctuation right after it (« : », « ? », « » »…), even across the French space.
+ * Neither can then start or end a row of its own.
+ */
+function aroundHero(text: string, at: number, len: number): { before: string; heroText: string; after: string } {
+  let before = text.slice(0, at);
+  let after = text.slice(at + len);
+  const open = /(^|\s)([«“‘(]+|")(\s*)$/.exec(before);
+  // a straight quote opens only when it is the odd one out
+  const opens = open && (open[2] !== '"' || (before.match(/"/g) ?? []).length % 2 === 1);
+  let lead = "";
+  if (open && opens) {
+    lead = open[2]! + (open[3] ? NBSP : "");
+    before = before.slice(0, open.index + open[1]!.length);
+  }
+  let tail = "";
+  // every mark that follows (« Us" ! »), but a straight quote after a space that a word follows opens the next quote
+  for (let close = /^(\s*)([,.;:?!…»”’)"]+)/.exec(after); close; close = /^(\s*)([,.;:?!…»”’)"]+)/.exec(after)) {
+    if (close[2]!.includes('"') && close[1] && /^\S/.test(after.slice(close[0].length))) break;
+    tail += (close[1] ? NBSP : "") + close[2]!;
+    after = after.slice(close[0].length);
+  }
+  return { before: before.trim(), heroText: lead + text.slice(at, at + len) + tail, after: after.trim() };
+}
+
+/** Words as spans of letters; a no-break space inside a word (« dit : ») is a space, not a letter to type. */
 function chars(text: string): string {
-  return text
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => `<span class="w">${[...w].map((c) => `<span class="ch">${esc(c)}</span>`).join("")}</span>`)
+  return textWords(text)
+    .map((w) => `<span class="w">${[...w].map((c) => (c === NBSP || c === "\u202f" ? "&nbsp;" : `<span class="ch">${esc(c)}</span>`)).join("")}</span>`)
     .join(" ");
 }
 
@@ -566,7 +586,8 @@ function coverOutroJs(sid: string, s0: number, dur: number): string[] {
 }
 
 function kineticLines(text: string): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
+  // a mark never starts a line: « : » or « » » travels with its word
+  const words = textWords(text);
   const n = Math.min(5, Math.max(3, Math.round(words.length / 3)));
   const per = text.length / n;
   const lines: string[] = [];
