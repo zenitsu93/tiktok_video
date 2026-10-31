@@ -11,7 +11,7 @@ import { animatedGif, ff, ingestClip, ingestImage, ingestVoice, sliceTake, store
 import { editBeat, readMoves, splitScript, writeCaption, writeScript } from "./providers/claude";
 import { demoCaption, demoImages, demoScript, demoSplit, demoVoice } from "./providers/demo";
 import { speak, speakTake } from "./providers/elevenlabs";
-import { deezerCover, fetchImage, searchPinterest } from "./providers/images";
+import { deezerCover, fetchImage, SearchError, searchPinterest } from "./providers/images";
 import { exportVideo, prerenderScenes } from "./render";
 
 const db = () => getDb();
@@ -157,10 +157,19 @@ export async function imagesFor(videoId: string, beatIds: string[], opts: { quer
       const variant = opts.fresh ? ` ${VARIANTS[Math.floor(first.candidates.length / want) % VARIANTS.length]}` : "";
       // the next search of the idea only when the ones before did not bring enough new pins:
       // most ideas fill up on their first search, and every pin returned is billed
+      // a search Apify cannot run does not sink the idea: the next words of the idea are tried
+      let failure: Error | null = null;
       for (const q of query.queries) {
         if (new Set(urls.filter((u) => !known.has(u))).size >= want) break;
-        urls.push(...(await searchPinterest(videoId, q + variant, want, known)));
+        try {
+          urls.push(...(await searchPinterest(videoId, q + variant, want, known)));
+        } catch (e) {
+          if (!(e instanceof SearchError)) throw e;
+          console.warn("[images]", e.message);
+          failure = e;
+        }
       }
+      if (failure && !urls.some((u) => !known.has(u))) throw failure;
       for (const url of [...new Set(urls)].filter((u) => !known.has(u))) {
         if (added.length >= want) break;
         try {
@@ -321,8 +330,10 @@ export async function generate(videoId: string) {
     const found = new Set((await load(videoId)).doc.beats.filter((b) => b.candidates.length).map((b) => b.id));
     const missing = todo.filter((g) => !g.some((id) => found.has(id)));
     const first = failed.find((f) => f.error instanceof BudgetError) ?? failed[0]!;
-    const message = `Pas d'images pour ${missing.length} ${missing.length > 1 ? "idées" : "idée"}, à partir de ${missing[0]?.[0] ?? first.beats[0]}. ${first.error.message}`;
-    if (!(first.error instanceof BudgetError)) throw new Error(message);
+    const where = (missing.length ? missing : failed.map((f) => f.beats)).map((g) => g[0]).join(", ");
+    const message = `Pas d'images pour ${missing.length || failed.length} ${(missing.length || failed.length) > 1 ? "idées" : "idée"} (${where}). ${first.error.message}`;
+    // a search that failed (not the budget): the video waits, « Réessayer » runs only those searches again
+    if (!(first.error instanceof BudgetError)) throw new Error(`${message} Clique sur « Réessayer les images », ou mets « Ma photo » dans ces plans.`);
     // over budget the video is not stuck: Thomas puts his own pictures on those lines (free), then mounts it
     notice = `${message} Mets tes propres images avec « Ma photo » dans ces plans, puis « Envoyer sur TikTok ».`;
   }

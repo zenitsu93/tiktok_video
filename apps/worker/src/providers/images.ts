@@ -65,18 +65,43 @@ export function pinUrls(item: unknown): string[] {
   return [...new Set(found)].sort((a, b) => rank(b) - rank(a));
 }
 
-/**
- * Pinterest search through the Apify actor; returns the best image URL of each pin.
- * The exact same words already searched (on any video) give their pins again, free, unless
- * this video has them all already (`skip`): then the search is paid for again.
- */
-export async function searchPinterest(videoId: string, query: string, limit: number, skip: Set<string | undefined> = new Set()): Promise<string[]> {
-  const saved = await getPinSearch(getDb(), query);
-  if (saved?.some((u) => !skip.has(u))) {
-    console.log(`[images] « ${query} » déjà cherché : ${saved.length} pins repris, pas d'appel Apify`);
-    return saved;
+/** A Pinterest search that Apify could not run: says why in plain words, for Thomas. */
+export class SearchError extends Error {}
+
+/** The words of a search without what trips the actor up: quotes, punctuation, more than six words. */
+export function plainQuery(query: string): string {
+  return query
+    .replace(/[^\p{L}\p{N}' -]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 6)
+    .join(" ");
+}
+
+/** Why a run failed, from Apify itself (its status message), so the error says more than « FAILED ». */
+async function runReason(runId: string, token: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://api.apify.com/v2/actor-runs/${encodeURIComponent(runId)}`, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return null;
+    const run = ((await res.json()) as { data?: { status?: string; statusMessage?: string; exitCode?: number } }).data;
+    const log = await fetch(`https://api.apify.com/v2/actor-runs/${encodeURIComponent(runId)}/log`, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(15_000),
+    })
+      .then((r) => (r.ok ? r.text() : ""))
+      .catch(() => "");
+    // the end of the actor's log goes to the worker's log: that is where the real cause is written
+    if (log) console.warn(`[images] log du run Apify ${runId} :\n${log.split("\n").slice(-25).join("\n")}`);
+    return run?.statusMessage?.trim() || null;
+  } catch {
+    return null;
   }
-  await assertBudget(videoId);
+}
+
+async function runActor(query: string, limit: number): Promise<unknown[]> {
   const e = env();
   const res = await fetch(
     `https://api.apify.com/v2/acts/${encodeURIComponent(e.APIFY_PINTEREST_ACTOR)}/run-sync-get-dataset-items?timeout=120&clean=true`,
@@ -88,15 +113,44 @@ export async function searchPinterest(videoId: string, query: string, limit: num
       signal: AbortSignal.timeout(150_000),
     },
   );
-  if (!res.ok) {
-    const detail = (await res.text()).slice(0, 300);
-    // the account's monthly spending cap: nothing will pass until it is raised or the month turns
-    if (/usage hard limit|platform-feature-disabled/i.test(detail)) {
-      throw new BudgetError("Ton compte Apify a atteint sa limite de dépense du mois. Relève-la sur console.apify.com (Billing, Limits), puis clique sur « Reprendre ».");
-    }
-    throw new Error(`Apify a répondu ${res.status} : ${detail}`);
+  if (res.ok) return (await res.json()) as unknown[];
+  const detail = (await res.text()).slice(0, 300);
+  // the account's monthly spending cap: nothing will pass until it is raised or the month turns
+  if (/usage hard limit|platform-feature-disabled|not-enough-usage|insufficient/i.test(detail)) {
+    throw new BudgetError("Ton compte Apify a atteint sa limite de dépense du mois. Relève-la sur console.apify.com (Billing, Limits), puis clique sur « Reprendre ».");
   }
-  const items = (await res.json()) as unknown[];
+  if (res.status === 401 || res.status === 403) throw new SearchError("Apify refuse la clé de la Régie (APIFY_TOKEN) : elle a expiré ou a été changée.");
+  const runId = /run ID: ([A-Za-z0-9]+)/.exec(detail)?.[1];
+  if (runId) {
+    const why = await runReason(runId, e.APIFY_TOKEN!);
+    throw new SearchError(`La recherche Pinterest « ${query} » a planté chez Apify${why ? ` (${why})` : ""}.`);
+  }
+  if (/timed-out|TIMED-OUT/.test(detail) || res.status === 408) throw new SearchError(`La recherche Pinterest « ${query} » a mis trop de temps chez Apify.`);
+  throw new SearchError(`Apify a répondu ${res.status} pour « ${query} » : ${detail}`);
+}
+
+/**
+ * Pinterest search through the Apify actor; returns the best image URL of each pin.
+ * The exact same words already searched (on any video) give their pins again, free, unless
+ * this video has them all already (`skip`): then the search is paid for again.
+ * A run that fails is tried once more, with plain words (no quotes or punctuation, six words
+ * at most) when those differ: a failed run returns nothing, so it is not billed per pin.
+ */
+export async function searchPinterest(videoId: string, query: string, limit: number, skip: Set<string | undefined> = new Set()): Promise<string[]> {
+  const saved = await getPinSearch(getDb(), query);
+  if (saved?.some((u) => !skip.has(u))) {
+    console.log(`[images] « ${query} » déjà cherché : ${saved.length} pins repris, pas d'appel Apify`);
+    return saved;
+  }
+  await assertBudget(videoId);
+  let items: unknown[];
+  try {
+    items = await runActor(query, limit);
+  } catch (e) {
+    if (!(e instanceof SearchError)) throw e;
+    console.warn(`[images] ${e.message} Nouvel essai.`);
+    items = await runActor(plainQuery(query) || query, limit);
+  }
   await recordUsage(getDb(), {
     videoId,
     provider: "apify",

@@ -563,6 +563,8 @@ export function Fil({ initial }: { initial: VideoView }) {
   let msg: React.ReactNode;
   let acts: React.ReactNode = null;
   if (who === "err") {
+    // searches that failed: the button says what it does again (only the missing images)
+    const images = /^Pas d'images? pour/.test(v.error ?? "");
     msg = (
       <span className="chip hot" role="alert" style={{ whiteSpace: "normal" }}>
         <span className="dot" />
@@ -582,8 +584,12 @@ export function Fil({ initial }: { initial: VideoView }) {
             <Hand size={15} /> Mettre mes images
           </button>
         )}
-        <button className="btn primary" title="Reprend là où ça s'est arrêté : ce qui est déjà fait n'est pas refait" onClick={() => run(() => call(`${url}/resume`, "POST").then(refresh), "Reprise lancée")}>
-          <RotateCcw size={15} /> Reprendre
+        <button
+          className="btn primary"
+          title={images ? "Relance seulement les recherches des plans sans image : les images déjà trouvées restent" : "Reprend là où ça s'est arrêté : ce qui est déjà fait n'est pas refait"}
+          onClick={() => run(() => call(`${url}/resume`, "POST").then(refresh), images ? "Nouvelle recherche lancée" : "Reprise lancée")}
+        >
+          <RotateCcw size={15} /> {images ? "Réessayer les images" : "Reprendre"}
         </button>
       </>
     );
