@@ -19,7 +19,8 @@ function sendState(v: VideoView, pending: boolean) {
   const current = v.tiktok.send?.current ? v.tiktok.send : null;
   const moving = pending || (Boolean(current) && tiktokMoving(v));
   const sent = current?.status === "inbox";
-  const unconfirmed = current?.status === "processing" && !tiktokMoving(v);
+  // TikTok never said « in the inbox »: the worker gave up after fifteen minutes, or the line timed out
+  const unconfirmed = current?.status === "unconfirmed" || (current?.status === "processing" && !tiktokMoving(v));
   const stage = pending || current?.status === "sending" ? "sending" : moving ? "processing" : sent ? "done" : "idle";
   return { current, moving, sent, unconfirmed, stage };
 }

@@ -100,7 +100,11 @@ export const tiktokAuth = pgTable("tiktok_auth", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export type TikTokSendStatus = "sending" | "processing" | "inbox" | "error";
+/**
+ * sending → processing → inbox, or error. « unconfirmed »: TikTok never said it was in the inbox
+ * (it usually is anyway). « cancelled »: Thomas stopped it, or it was left hanging.
+ */
+export type TikTokSendStatus = "sending" | "processing" | "inbox" | "error" | "unconfirmed" | "cancelled";
 
 /** Each export sent to the TikTok inbox, newest last. */
 export const tiktokSends = pgTable(

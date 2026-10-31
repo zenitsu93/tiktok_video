@@ -84,6 +84,7 @@ async function tokenCall(params: Record<string, string>): Promise<TokenResponse 
   const r = await fetch(`${API}/oauth/token/`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", "Cache-Control": "no-cache" },
+    signal: AbortSignal.timeout(30_000),
     body: new URLSearchParams({ client_key: e.TIKTOK_CLIENT_KEY ?? "", client_secret: e.TIKTOK_CLIENT_SECRET ?? "", ...params }),
   });
   const j = (await r.json().catch(() => ({}))) as TokenResponse;
@@ -143,6 +144,8 @@ async function api<T>(path: string, token: string, body: unknown): Promise<T> {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json; charset=UTF-8" },
     body: JSON.stringify(body),
+    // a call that hangs held the queue: every later send stayed « Envoi… » behind it
+    signal: AbortSignal.timeout(30_000),
   });
   const j = (await r.json().catch(() => ({}))) as { data?: T; error?: { code?: string; message?: string } };
   const code = j.error?.code ?? (r.ok ? "ok" : `http_${r.status}`);
@@ -163,6 +166,9 @@ export async function uploadToInbox(token: string, video: Buffer): Promise<strin
       method: "PUT",
       headers: { "Content-Type": "video/mp4", "Content-Length": String(end - start), "Content-Range": `bytes ${start}-${end - 1}/${video.length}` },
       body: new Uint8Array(video.subarray(start, end)),
+      signal: AbortSignal.timeout(5 * 60_000),
+    }).catch((e: Error) => {
+      throw new TikTokError(e.name === "TimeoutError" ? "TikTok n'a pas reçu le fichier en 5 minutes. Réessaie." : "L'envoi du fichier à TikTok a été coupé. Réessaie.", "upload_timeout");
     });
     if (r.status !== 201 && r.status !== 206 && !r.ok) throw new TikTokError(`L'envoi du fichier à TikTok a échoué (HTTP ${r.status}).`, `upload_${r.status}`);
   }
