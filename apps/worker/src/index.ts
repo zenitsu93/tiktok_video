@@ -1,7 +1,7 @@
 import { closeDb, expireTikTokSends, getDb, setError, setProgress, setStatus } from "@regie/db";
 import { BudgetError, env, jobData, JOBS, providers, queue, retryLimit, type JobName } from "@regie/server";
 import { cleanup } from "./cleanup";
-import { caption, cleanImage, generate, ownImage, moreImages, prerender, render, restyle, reviseScript, revoice, rewrite } from "./pipeline";
+import { caption, changeCover, cleanImage, generate, ownImage, moreImages, prerender, render, restyle, reviseScript, revoice, rewrite } from "./pipeline";
 import { sendToTikTok } from "./tiktok";
 
 /**
@@ -47,6 +47,7 @@ await handle(JOBS.script, 1, (d: { videoId: string; instruction: string }) => re
 await handle(JOBS.voice, 3, (d: { videoId: string; beatId: string }) => revoice(d.videoId, d.beatId));
 await handle(JOBS.images, 2, (d: { videoId: string; beatId: string; instruction?: string }) => moreImages(d.videoId, d.beatId, d.instruction));
 await handle(JOBS.upload, 2, (d: { videoId: string; beatId: string; key: string; also?: string[]; mime?: string }) => ownImage(d.videoId, d.beatId, d.key, d.also, d.mime));
+await handle(JOBS.cover, 1, (d: { videoId: string; source: "deezer" | "pinterest" | "upload"; key?: string }) => changeCover(d.videoId, d.source, d.key));
 await handle(JOBS.clean, 1, (d: { videoId: string; beatId: string }) => cleanImage(d.videoId, d.beatId));
 await handle(JOBS.rewrite, 2, (d: { videoId: string; beatId: string; instruction: string }) => rewrite(d.videoId, d.beatId, d.instruction));
 await handle(JOBS.render, 1, (d: { videoId: string; send?: boolean }) => render(d.videoId, d.send ?? true), true);
