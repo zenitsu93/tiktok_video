@@ -75,17 +75,22 @@ export function queue(): Promise<PgBoss> {
 // a head start that fails is not worth another go: the export does the scene anyway
 export const retryLimit = (name: JobName) => (name === JOBS.tiktok || name === JOBS.prerender ? 0 : name === JOBS.generate || name === JOBS.render ? 4 : 3);
 
-export async function enqueue<N extends JobName>(name: N, data: JobData<N>): Promise<string | null> {
-  const parsed = jobData[name].parse(data);
-  const b = await queue();
-  return b.send(name, parsed, {
+/** pg-boss options for one job. A key set to undefined counts as set for pg-boss (« expireInSeconds must be at least every second »). */
+export function sendOptions(name: JobName, data: unknown) {
+  return {
     // spaced retries (10 s, 20 s, 40 s…) ride out a few minutes without internet;
     // the pipeline skips what is already done, so a retry does not pay twice
     retryLimit: retryLimit(name),
     retryDelay: 10,
     retryBackoff: true,
     // a send follows TikTok for fifteen minutes after the upload: pg-boss's default (15 min) cut it short
-    expireInSeconds: name === JOBS.tiktok ? 30 * 60 : undefined,
-    singletonKey: name === JOBS.render || name === JOBS.prerender ? (parsed as JobData<typeof JOBS.render>).videoId : undefined,
-  });
+    ...(name === JOBS.tiktok ? { expireInSeconds: 30 * 60 } : {}),
+    ...(name === JOBS.render || name === JOBS.prerender ? { singletonKey: (data as { videoId: string }).videoId } : {}),
+  };
+}
+
+export async function enqueue<N extends JobName>(name: N, data: JobData<N>): Promise<string | null> {
+  const parsed = jobData[name].parse(data);
+  const b = await queue();
+  return b.send(name, parsed, sendOptions(name, parsed));
 }
