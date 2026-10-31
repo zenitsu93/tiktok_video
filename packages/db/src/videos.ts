@@ -28,6 +28,8 @@ export async function listVideos(db: Db, limit = 30) {
       progress: videos.progress,
       updatedAt: videos.updatedAt,
       renderAsset: videos.renderAsset,
+      downloadedAt: videos.downloadedAt,
+      publishedAt: videos.publishedAt,
       caption: sql<string | null>`${videos.doc}->>'caption'`,
     })
     .from(videos)
@@ -72,6 +74,20 @@ export async function undo(db: Db, id: string): Promise<VideoRow | undefined> {
     .limit(1);
   if (!prev) return row;
   return mutateDoc(db, id, `annuler (retour à la version ${prev.version})`, () => prev.doc);
+}
+
+/** « Publiée », ticked or unticked by hand. The list order (updatedAt) does not move. */
+export async function setPublished(db: Db, id: string, published: boolean) {
+  const [row] = await db
+    .update(videos)
+    .set({ publishedAt: published ? new Date() : null })
+    .where(eq(videos.id, id))
+    .returning({ publishedAt: videos.publishedAt });
+  return row;
+}
+
+export async function markDownloaded(db: Db, id: string) {
+  await db.update(videos).set({ downloadedAt: new Date() }).where(eq(videos.id, id));
 }
 
 export async function setStatus(db: Db, id: string, status: VideoStatus, progress: Progress | null = null, error: string | null = null) {

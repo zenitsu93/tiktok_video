@@ -50,6 +50,13 @@
       "when": 1793397332862,
       "tag": "0006_pin_searches",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793411404153,
+      "tag": "0007_published",
+      "breakpoints": true
     }
   ]
 }

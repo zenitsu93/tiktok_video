@@ -47,6 +47,8 @@ const video = (over: Partial<VideoView> = {}): VideoView => ({
   busy: [],
   dirty: [],
   download: null,
+  downloadedAt: null,
+  publishedAt: null,
   preview: "",
   costs: [],
   spent: 0,
@@ -66,10 +68,12 @@ describe("stepOf", () => {
     expect(stepOf(video())).toEqual({ step: 3, who: "you" });
     expect(stepOf(video({ status: "rendering" }))).toEqual({ step: 4, who: "run" });
     expect(stepOf(video({ download: "/mp4" }))).toEqual({ step: 5, who: "you" });
+    // in the TikTok inbox is not published yet: only the tick ends the Piste
     expect(stepOf(video({ download: "/mp4", tiktok: { configured: true, connected: true, send: { status: "inbox", error: null, at: "", current: true } } }))).toEqual({
       step: 5,
-      who: "done",
+      who: "you",
     });
+    expect(stepOf(video({ download: "/mp4", publishedAt: "2026-10-31T01:00:00.000Z" }))).toEqual({ step: 5, who: "done" });
   });
 
   it("keeps the rewrite of the script on Histoire", () => {
