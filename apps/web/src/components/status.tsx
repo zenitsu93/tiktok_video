@@ -4,7 +4,8 @@ const LABELS = {
   generating: ["En préparation", "warn"],
   listen: ["Voix à écouter", "warn"],
   ready: ["Prête", "ok"],
-  rendering: ["Montage", "warn"],
+  // the montage is the preview: here only its MP4 is being made
+  rendering: ["Fichier en cours", "warn"],
   error: ["Erreur", "hot"],
 } as const;
 

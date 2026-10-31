@@ -49,7 +49,7 @@ await handle(JOBS.images, 2, (d: { videoId: string; beatId: string; instruction?
 await handle(JOBS.upload, 2, (d: { videoId: string; beatId: string; key: string; also?: string[]; mime?: string }) => ownImage(d.videoId, d.beatId, d.key, d.also, d.mime));
 await handle(JOBS.clean, 1, (d: { videoId: string; beatId: string }) => cleanImage(d.videoId, d.beatId));
 await handle(JOBS.rewrite, 2, (d: { videoId: string; beatId: string; instruction: string }) => rewrite(d.videoId, d.beatId, d.instruction));
-await handle(JOBS.render, 1, (d: { videoId: string }) => render(d.videoId), true);
+await handle(JOBS.render, 1, (d: { videoId: string; send?: boolean }) => render(d.videoId, d.send ?? true), true);
 await handle(JOBS.caption, 1, (d: { videoId: string }) => caption(d.videoId));
 await handle(JOBS.restyle, 1, (d: { videoId: string }) => restyle(d.videoId));
 

@@ -440,10 +440,11 @@ export function Fil({ initial }: { initial: VideoView }) {
               v={v}
               canRender={canRender}
               upToDate={upToDate}
-              render={(again) =>
+              render={() => run(() => call(`${url}/render`, "POST"), "Fichier refait : il repart sur TikTok tout seul")}
+              prepare={() =>
                 run(
-                  () => call(`${url}/render`, "POST"),
-                  again ? "Fichier refait : il repart sur TikTok tout seul" : v.tiktok.connected ? "Préparation du fichier, puis envoi sur TikTok" : v.download ? "Seuls les plans modifiés repassent au rendu" : "Préparation du MP4",
+                  () => call(`${url}/render`, "POST", { send: false }),
+                  v.download ? "Seuls les plans modifiés repassent au rendu" : "Fabrication du MP4 : ensuite, télécharge-le ou envoie-le sur TikTok",
                 )
               }
               flash={flash}
@@ -521,14 +522,14 @@ export function Fil({ initial }: { initial: VideoView }) {
           {v.status === "ready" && !v.download && v.manualImages && (
             <div className="panel step" role="status">
               <b>Étape 3 : trouve tes images</b>
-              <span className="mute">Une case par idée. L&apos;aperçu est la vidéo finale : quand chaque case a son image, « Envoyer sur TikTok ».</span>
+              <span className="mute">Une case par idée. L&apos;aperçu est la vidéo finale : quand chaque case a son image, « Fabriquer le MP4 ».</span>
             </div>
           )}
           {v.status === "ready" && !v.download && !v.manualImages && (
             <div className="panel step" role="status">
               <b>Étape 3 : vérifie les images</b>
               <span className="mute">
-                L&apos;aperçu est la vidéo finale. Change ce qui ne va pas (clique sur une phrase), puis « Envoyer sur TikTok ».
+                L&apos;aperçu est la vidéo finale. Change ce qui ne va pas (clique sur une phrase), puis « Fabriquer le MP4 » : ensuite, télécharge-le ou envoie-le sur TikTok.
               </span>
             </div>
           )}
