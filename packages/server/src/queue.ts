@@ -40,7 +40,7 @@ export const jobData = {
   [JOBS.upload]: z.object({ videoId: z.string().uuid(), beatId: z.string(), key: z.string().regex(/^uploads\/[0-9a-f-]{36}$/), also: z.array(z.string()).max(40).optional(), mime: z.string().max(40).optional() }),
   [JOBS.script]: z.object({ videoId: z.string().uuid(), instruction: z.string().min(1).max(1000) }),
   [JOBS.rewrite]: z.object({ videoId: z.string().uuid(), beatId: z.string(), instruction: z.string().min(1).max(500) }),
-  [JOBS.render]: z.object({ videoId: z.string().uuid() }),
+  [JOBS.render]: z.object({ videoId: z.string().uuid(), send: z.boolean().optional() }),
   [JOBS.tiktok]: z.object({ videoId: z.string().uuid(), sendId: z.string().uuid() }),
   [JOBS.caption]: z.object({ videoId: z.string().uuid() }),
   [JOBS.cleanup]: z.object({}),

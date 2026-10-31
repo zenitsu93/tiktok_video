@@ -329,7 +329,7 @@ export async function generate(videoId: string) {
   if (!(await load(videoId)).doc.cover) await coverFor(videoId);
   // a caption that fails does not hold the video back: the « Écrire la légende » button retries it
   if (!(await load(videoId)).doc.caption) await caption(videoId).catch((e) => console.warn("[légende]", (e as Error).message));
-  // the montage waits for Thomas too: he checks the shots, then « Envoyer sur TikTok » (which makes the file, then sends it);
+  // the montage waits for Thomas too: he checks the shots, then « Fabriquer le MP4 », then downloads it or sends it to TikTok;
   // meanwhile the scenes are made ahead, so that click has little left to do
   await setStatus(db(), videoId, "ready", null, notice);
   // by hand, the scenes are made ahead as the pictures come in (each « Ma photo » starts it)
@@ -513,10 +513,11 @@ export async function revoice(videoId: string, beatId: string) {
   await onBeat(videoId, beatId, () => voiceBeat(videoId, beatId));
 }
 
-export async function render(videoId: string) {
+/** `send: false` (« Télécharger le MP4 »): the file is only made, it does not leave for TikTok. */
+export async function render(videoId: string, send = true) {
   const row = await load(videoId);
   if (row.doc.beats.some((b) => !b.voice)) throw new Error("Toutes les phrases n'ont pas encore de voix.");
-  await setStatus(db(), videoId, "rendering", { step: "Montage", done: 0, total: 1 });
+  await setStatus(db(), videoId, "rendering", { step: "Fichier vidéo", done: 0, total: 1 });
   // a line whose reading changed since its voice (a pronunciation added on another video…) is voiced again first,
   // so the export never carries the old reading
   const lexicon = await pronunciationLexicon(db());
@@ -536,12 +537,12 @@ export async function render(videoId: string) {
   }
   if (revoiced) await remixVoice(videoId);
   const doc = revoiced ? (await load(videoId)).doc : row.doc;
-  const res = await exportVideo(videoId, doc, (done, total) => setProgress(db(), videoId, { step: "Montage des plans", done, total }));
+  const res = await exportVideo(videoId, doc, (done, total) => setProgress(db(), videoId, { step: "Plans du fichier", done, total }));
   await setRendered(db(), videoId, res.asset.id, res.hashes);
   await setStatus(db(), videoId, "ready");
   console.log(`[render] ${videoId}: ${res.rendered}/${res.total} scènes rendues, le reste venait du cache`);
   // the export is done either way: a send that cannot start shows on its line, or the button stays
-  await autoSend(videoId, res.asset.id).catch((e) => console.warn("[tiktok] envoi automatique :", (e as Error).message));
+  if (send) await autoSend(videoId, res.asset.id).catch((e) => console.warn("[tiktok] envoi automatique :", (e as Error).message));
   // a video from before the captions, or whose caption failed, gets one now, ready to paste
   if (!(await load(videoId)).doc.caption) await caption(videoId).catch((e) => console.warn("[légende]", (e as Error).message));
 }

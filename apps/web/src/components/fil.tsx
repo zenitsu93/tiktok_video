@@ -1,18 +1,19 @@
 "use client";
 
 import { ENTRANCE_LABELS, ENTRANCES, LAYOUT_LABELS, LAYOUTS, MOVE_LABELS, MOVES, type BeatPatch } from "@regie/core";
-import { ArrowLeft, Hand, Image as ImageIcon, ImagePlus, LayoutGrid, List, Loader2, Maximize2, Mic, Minimize2, Pause, Play, RotateCcw, Scissors, Send, Undo2, Wand2 } from "lucide-react";
+import { ArrowLeft, Check, Download, Film, Hand, Image as ImageIcon, ImagePlus, LayoutGrid, List, Loader2, Maximize2, Mic, Minimize2, MoreHorizontal, Pause, Play, RotateCcw, Scissors, Undo2, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { missingImages, reachable, reading, rewriting, stepOf, STEPS, upToDate, voiceMissing } from "@/lib/steps";
 import type { BeatView, VideoView } from "@/lib/view";
-import { Caption } from "./caption";
+import { CopyCaption } from "./caption";
 import { DeleteVideo } from "./delete-video";
-import { Lecture } from "./lecture";
+import { Histoire, tooShort, type ScriptSend } from "./lecture";
 import { Planche } from "./planche";
 import { PronounceWords, type Notify } from "./pronunciations";
-import { Publish, tiktokMoving } from "./tiktok-send";
+import { SendToTikTok, TikTokTab, tiktokMoving } from "./tiktok-send";
 import { StatusChip } from "./status";
-import { chime, Fan, Grooves, LineBusy, Platine, Sleeve, stageOf } from "./waits";
+import { chime, Disc, Fan, Grooves, LineBusy } from "./waits";
 
 type Job = { kind: "images" | "clean" | "voice" | "rewrite"; query?: string; at: number };
 
@@ -128,7 +129,6 @@ export function Fil({ initial }: { initial: VideoView }) {
       localStorage.setItem("regie:side", String(c));
     } catch {}
   };
-  const [done, setDone] = useState(false);
   // the preview: the previous frame stays, blurred, until the new one is ready
   const [frames, setFrames] = useState<{ src: string; ready: boolean }[]>([{ src: initial.preview, ready: false }]);
   const refs = useRef(new Map<string, HTMLIFrameElement>());
@@ -200,11 +200,10 @@ export function Fil({ initial }: { initial: VideoView }) {
     setFrames((f) => (f.at(-1)?.src === v.preview ? f : [...f.slice(-1), { src: v.preview, ready: false }]));
   }, [v.preview]);
 
-  // the export is out: sleeve, tab title, chime
+  // the export is out: tab title, chime (the TikTok tab opens by itself)
   const prevStatus = useRef(v.status);
   useEffect(() => {
     if (prevStatus.current === "rendering" && v.status === "ready" && v.download) {
-      setDone(true);
       chime();
       if (document.hidden) document.title = `✓ Prête · ${v.title}`;
     }
@@ -346,16 +345,11 @@ export function Fil({ initial }: { initial: VideoView }) {
     return run(() => call(`${url}/beats/${id}/${a}`, "POST", instruction ? { instruction } : {}), ok);
   };
 
-  // keyboard: up and down move along the script, "/" goes to the command bar
-  const cmd = useRef<HTMLInputElement>(null);
+  // keyboard: up and down move along the lines (Voix, Images, Montage)
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.key === "/") {
-        e.preventDefault();
-        cmd.current?.focus();
-      }
+      if (tag === "INPUT" || tag === "TEXTAREA" || tab < 1 || tab > 3) return;
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         const i = v.beats.findIndex((b) => b.id === sel);
         const n = v.beats[Math.max(0, Math.min(v.beats.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))];
@@ -371,194 +365,134 @@ export function Fil({ initial }: { initial: VideoView }) {
   });
 
   const nowBeat = v.beats.findLast((b) => b.start <= t + 0.01)?.id;
-  // the first pass, from "Lancer" to the first MP4, while a step is at work
-  const firstRun = !v.download && (v.status === "generating" || v.status === "rendering");
-  const voiceMissing = v.beats.some((b) => b.voiceStale);
-  // the montage only once the voice is approved and the images are there
+  const { step, who } = stepOf(v);
+  const missing = missingImages(v);
+  const fresh = upToDate(v);
+  // the MP4 only once the voice is approved and the images are there
   const canRender = v.beats.length > 0 && v.status !== "generating" && v.status !== "rendering" && v.status !== "listen";
-  // lines that need a picture and have none (the search failed, or the budget ran out)
-  const missing = v.beats.filter((b) => !b.image && (b.layout === "card" || b.layout === "cutout"));
-  const upToDate = Boolean(v.download) && v.dirty.length === 0 && !voiceMissing;
-  // « je cherche moi-même » : La Planche until the first export, Le Fil a click away
+
+  // the tab on screen: while the Régie works the reading stays where it is (the voice starts on Histoire,
+  // so the text stays in sight); when the hand comes back to Thomas, his step opens
+  const [tab, setTab] = useState(() => (who === "run" && step === 1 ? 0 : step));
+  const at = useRef(`${step}:${who}`);
+  useEffect(() => {
+    const k = `${step}:${who}`;
+    if (at.current === k) return;
+    at.current = k;
+    if (who !== "run") setTab(step);
+  }, [step, who]);
+  // on a phone the Piste scrolls: keep the open tab in sight
+  useEffect(() => {
+    document.querySelector(".piste .on")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [tab]);
+  const open = (i: number) => {
+    setTab(i);
+    window.scrollTo?.({ top: 0 });
+  };
+
+  // the script while it is read: kept here so « Valider le script » can sit in the action bar
+  const [script, setScript] = useState(initial.draft ?? "");
+  const savedDraft = useRef(initial.draft ?? "");
+  useEffect(() => {
+    if (v.draft !== null && v.draft !== savedDraft.current) {
+      savedDraft.current = v.draft;
+      setScript(v.draft);
+    }
+  }, [v.draft]);
+  const [scriptPending, setScriptPending] = useState(false);
+  const sendScript: ScriptSend = async (payload, ok) => {
+    setScriptPending(true);
+    try {
+      await run(() => call(`${url}/script`, "POST", payload).then(refresh), ok);
+      savedDraft.current = payload.draft;
+    } finally {
+      setScriptPending(false);
+    }
+  };
+
+  // one way to ask Claude about a line: the command route picks a new search or a rewrite
+  const askClaude = async (beatId: string, input: string) => {
+    try {
+      const r = await call(`${url}/command`, "POST", { input, selected: beatId });
+      track(r.beatId, r.kind, r.kind === "images" ? r.instruction : undefined);
+      setEager(Date.now() + 90_000);
+      flash(r.kind === "images" ? "La Régie cherche d'autres images…" : "Claude retouche la phrase…");
+      return true;
+    } catch (e) {
+      flash((e as Error).message, true);
+      return false;
+    }
+  };
+
+  // Images: La Planche for « je cherche moi-même », Le Fil otherwise; both a click away at any time
   const [board, setBoard] = useState<boolean | null>(null);
-  const planche = v.manualImages && v.status !== "listen" && v.beats.length > 0 && (board ?? !v.download);
+  const planche = v.beats.length > 0 && (board ?? v.manualImages);
 
-  // the script waits to be read and approved before anything paid is spent
-  const rewriting = v.status === "generating" && /réécriture/i.test(v.progress?.step ?? "");
-  if (v.draft !== null && (v.status === "review" || rewriting)) {
-    return (
+  const render = () =>
+    run(() => call(`${url}/render`, "POST", { send: false }), v.download ? "Seuls les plans modifiés repassent au rendu" : "Fabrication du MP4");
+  const again = () => run(() => call(`${url}/render`, "POST"), "Fichier refait : il repart sur TikTok tout seul");
+  const queued = () => {
+    setEager(Date.now() + 15_000);
+    void refresh();
+  };
+  const goMissing = () => {
+    const b = missing[0];
+    if (!b) return;
+    if (tab < 1 || tab > 3) setTab(3);
+    choose(b);
+    setTimeout(() => document.getElementById(`beat-${b.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+  };
+
+  const lines = v.beats.length ? (
+    <div className="beats">
+      {v.beats.map((b) => (
+        <BeatRow
+          key={b.id}
+          b={b}
+          v={v}
+          selected={sel === b.id}
+          current={nowBeat === b.id}
+          onChoose={() => choose(b)}
+          job={jobs[b.id]}
+          patch={(p, ok) => patch(b.id, p, ok)}
+          action={(a, i, ok) => action(b.id, a, i, ok)}
+          ask={(input) => askClaude(b.id, input)}
+          notify={notify}
+        />
+      ))}
+    </div>
+  ) : (
+    <p className="mute" style={{ margin: 0 }}>
+      Les plans arrivent dès que le script est découpé.
+    </p>
+  );
+  const p = v.progress;
+  const count = p && p.total > 1 ? `${p.done}/${p.total}` : "";
+
+  let body: React.ReactNode;
+  if (tab === 0) body = <Histoire v={v} text={script} setText={setScript} send={sendScript} pending={scriptPending} />;
+  else if (tab === 1)
+    body = (
       <>
-        <Lecture v={v} rewriting={rewriting} send={(payload, ok) => run(() => call(`${url}/script`, "POST", payload).then(refresh), ok)} />
-        {toast && (
-          <div className={`toast${toast.err ? " err" : ""}`} role="status">
-            {toast.text}
-          </div>
-        )}
-      </>
-    );
-  }
-
-  return (
-    <div className="fil" style={{ "--side": `${side}px` } as React.CSSProperties}>
-      <main className="fil-main">
-        <header className="fil-head">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Link href="/" className="btn ghost sm" aria-label="Retour aux vidéos">
-              <ArrowLeft size={16} />
-            </Link>
-            <h1 className="t">
-              {v.title} <span>· {v.artist}</span>
-            </h1>
-          </div>
-          <div className="meta">
-            <StatusChip status={v.status}>{v.total > 0 && <span className="mono">{tc(v.total)}</span>}</StatusChip>
-            {v.angle && <span className="chip">angle : {v.angle}</span>}
-            {missing.length > 0 && !planche && (
-              <button
-                className="chip warn"
-                onClick={() => {
-                  choose(missing[0]!);
-                  document.getElementById(`beat-${missing[0]!.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-                }}
-                title={`Plans sans image : ${missing.map((b) => b.id).join(", ")}. Clique pour aller au premier, puis « Ma photo ».`}
-              >
-                <span className="dot" />
-                {missing.length} {missing.length > 1 ? "plans sans image" : "plan sans image"} → {missing[0]!.id}
-              </button>
-            )}
-            {v.download && v.dirty.length > 0 && (
-              <span className="chip hot">
-                <span className="dot" />
-                {v.dirty.length} {v.dirty.length > 1 ? "plans à re-rendre" : "plan à re-rendre"}
-              </span>
-            )}
-            <span style={{ marginLeft: "auto" }} />
-            <button className="btn sm" onClick={() => run(() => call(`${url}/undo`, "POST"), "Retour en arrière")} disabled={v.version <= 1}>
-              <Undo2 size={15} /> Annuler
-            </button>
-            <Publish
-              v={v}
-              canRender={canRender}
-              upToDate={upToDate}
-              render={(again) =>
-                run(
-                  () => call(`${url}/render`, "POST"),
-                  again ? "Fichier refait : il repart sur TikTok tout seul" : v.tiktok.connected ? "Préparation du fichier, puis envoi sur TikTok" : v.download ? "Seuls les plans modifiés repassent au rendu" : "Préparation du MP4",
-                )
-              }
-              flash={flash}
-              onQueued={() => {
-                setEager(Date.now() + 15_000);
-                void refresh();
-              }}
-            />
-            <DeleteVideo id={v.id} />
-          </div>
-          {v.beats.length > 0 && !firstRun && (
-            <Styles
-              v={v}
-              again={() => run(() => call(`${url}/restyle`, "POST"), "La Régie remonte la vidéo autrement")}
-              pick={(style) => run(() => call(`${url}/restyle`, "POST", { style }), `Retour au style ${style + 1}`)}
-            />
-          )}
-          {firstRun ? (
-            <Platine
-              stage={stageOf(v.progress?.step, v.status === "rendering")}
-              detail={v.progress && v.progress.total > 1 ? `${v.progress.done}/${v.progress.total}` : undefined}
-              compact={v.beats.length > 0}
-            />
-          ) : (
-            v.status === "rendering" &&
-            v.progress && (
-              <div className="export-progress" role="status">
-                <Grooves done={v.progress.done} total={Math.max(1, v.progress.total)} />
-                <div>
-                  <b>
-                    {v.progress.total > 1 ? v.progress.done : 0}
-                    <span>/{v.progress.total > 1 ? v.progress.total : "…"}</span>
-                  </b>
-                  <div className="mute" style={{ fontSize: 14 }}>
-                    plans du fichier prêts · seuls les plans modifiés repassent au rendu
-                  </div>
-                </div>
-              </div>
-            )
-          )}
-          {v.status === "listen" && (
-            <div className="panel step" role="status">
-              <b>Étape 2 : écoute la voix</b>
-              <span className="mute">
-                Lance l&apos;aperçu (▶). Un mot mal dit : « Prononciation », sous l&apos;aperçu. Une phrase à changer : clique dessus. Les images ne sont cherchées
-                qu&apos;après ta validation.
-              </span>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                <button
-                  className="btn primary sm"
-                  disabled={v.busy.length > 0 || voiceMissing}
-                  title={v.busy.length > 0 || voiceMissing ? "Une ligne attend encore sa voix" : "Pinterest via Apify, environ 1 $ par vidéo"}
-                  onClick={() => run(() => call(`${url}/voice`, "POST", {}).then(refresh), "Voix validée : recherche des images")}
-                >
-                  <Mic size={15} /> Valider · la Régie cherche
-                </button>
-                <button
-                  className="btn dark sm"
-                  disabled={v.busy.length > 0 || voiceMissing}
-                  title={
-                    v.busy.length > 0 || voiceMissing
-                      ? "Une ligne attend encore sa voix"
-                      : "Aucune recherche payante : tu prends les images sur Pinterest (la pochette et la légende sont faites quand même)"
-                  }
-                  onClick={() => {
-                    setBoard(true);
-                    void run(() => call(`${url}/voice`, "POST", { manual: true }).then(refresh), "Voix validée : à toi les images");
-                  }}
-                >
-                  <Hand size={15} /> Valider · je cherche moi-même
-                </button>
-              </div>
-            </div>
-          )}
-          {v.status === "ready" && !v.download && v.manualImages && (
-            <div className="panel step" role="status">
-              <b>Étape 3 : trouve tes images</b>
-              <span className="mute">Une case par idée. L&apos;aperçu est la vidéo finale : quand chaque case a son image, « Envoyer sur TikTok ».</span>
-            </div>
-          )}
-          {v.status === "ready" && !v.download && !v.manualImages && (
-            <div className="panel step" role="status">
-              <b>Étape 3 : vérifie les images</b>
-              <span className="mute">
-                L&apos;aperçu est la vidéo finale. Change ce qui ne va pas (clique sur une phrase), puis « Envoyer sur TikTok ».
-              </span>
-            </div>
-          )}
-          {v.error && (
-            <div className="chips" style={{ alignItems: "center" }}>
-              {/* at « ready » it is a notice (budget reached: own pictures to add), not a failure */}
-              <p className={`chip ${v.status === "error" ? "hot" : "warn"}`} role="alert" style={{ whiteSpace: "normal", margin: 0 }}>
-                {v.error}
-              </p>
-              {v.status === "error" && (
-                <button
-                  className="btn sm"
-                  title="Reprend là où ça s'est arrêté : ce qui est déjà fait n'est pas refait"
-                  onClick={() => run(() => call(`${url}/resume`, "POST").then(refresh), "Reprise lancée")}
-                >
-                  <RotateCcw size={14} /> Reprendre
-                </button>
-              )}
-            </div>
-          )}
-        </header>
-
-        {v.beats.length === 0 && v.status === "generating" && (
-          <p className="mute" style={{ fontSize: 18, margin: 0 }}>
-            Claude écrit l&apos;histoire. Les phrases apparaissent ici dès que le script est découpé.
+        {v.status === "listen" && (
+          <p className="mute" style={{ margin: 0, fontSize: 15 }}>
+            Lance l&apos;aperçu (▶). Un mot mal dit : clique la ligne, puis le mot. Une phrase à changer : clique-la. Les images ne sont cherchées qu&apos;après ta
+            validation.
           </p>
         )}
-
-        {v.manualImages && v.status !== "listen" && v.beats.length > 0 && (
-          <div className="seg-views" role="group" aria-label="Affichage">
+        {lines}
+      </>
+    );
+  else if (tab === 2)
+    body = (
+      <>
+        {v.status === "generating" && /image/i.test(p?.step ?? "") && (
+          <div className="banner" role="status">
+            <Disc size={22} /> La Régie cherche les images {count}. L&apos;aperçu se remplit au fur et à mesure ; une recherche déjà faite est reprise sans payer.
+          </div>
+        )}
+        {v.beats.length > 0 && (
+          <div className="seg-views" role="group" aria-label="Affichage des images">
             <button aria-pressed={planche} onClick={() => setBoard(true)}>
               <LayoutGrid size={14} /> La Planche
             </button>
@@ -567,104 +501,377 @@ export function Fil({ initial }: { initial: VideoView }) {
             </button>
           </div>
         )}
-
-        {planche ? (
-          <Planche v={v} notify={notify} onSearch={(id) => action(id, "images", undefined, "La Régie cherche pour cette idée…")} />
-        ) : (
-          <div className="beats">
-            {v.beats.map((b) => (
-              <BeatRow
-                key={b.id}
-                b={b}
-                v={v}
-                selected={sel === b.id}
-                current={nowBeat === b.id}
-                onChoose={() => choose(b)}
-                job={jobs[b.id]}
-                patch={(p, ok) => patch(b.id, p, ok)}
-                action={(a, i, ok) => action(b.id, a, i, ok)}
-                notify={notify}
-              />
-            ))}
+        {planche ? <Planche v={v} notify={notify} onSearch={(id) => action(id, "images", undefined, "La Régie cherche pour cette idée…")} /> : lines}
+      </>
+    );
+  else if (tab === 3)
+    body = (
+      <>
+        {v.beats.length > 0 && (
+          <Styles
+            v={v}
+            again={() => run(() => call(`${url}/restyle`, "POST"), "La Régie remonte la vidéo autrement")}
+            pick={(style) => run(() => call(`${url}/restyle`, "POST", { style }), `Retour au style ${style + 1}`)}
+          />
+        )}
+        {lines}
+      </>
+    );
+  else if (tab === 4)
+    body = (
+      <>
+        {v.status === "rendering" && p ? (
+          <div className="export-progress" role="status">
+            <Grooves done={p.done} total={Math.max(1, p.total)} />
+            <div>
+              <b>
+                {p.total > 1 ? p.done : 0}
+                <span>/{p.total > 1 ? p.total : "…"}</span>
+              </b>
+              <div className="mute" style={{ fontSize: 14 }}>
+                plans du fichier prêts · seuls les plans modifiés repassent au rendu
+              </div>
+            </div>
           </div>
+        ) : fresh ? (
+          <p className="chip ok" style={{ alignSelf: "flex-start" }}>
+            <span className="dot" /> Le MP4 est à jour : c&apos;est exactement l&apos;aperçu.
+          </p>
+        ) : v.download ? (
+          <p className="chip warn" style={{ alignSelf: "flex-start", whiteSpace: "normal" }}>
+            <span className="dot" /> {v.dirty.length > 0 ? `${v.dirty.length} ${v.dirty.length > 1 ? "plans ont changé" : "plan a changé"} depuis le dernier MP4.` : "La voix a changé depuis le dernier MP4."}
+          </p>
+        ) : (
+          <p className="mute" style={{ margin: 0 }}>
+            Le MP4 se fabrique quand l&apos;aperçu te va.
+          </p>
         )}
+        <p className="mute" style={{ margin: 0, fontSize: 15 }}>
+          L&apos;aperçu est déjà la vidéo montée : « Fabriquer le MP4 » en fait seulement le fichier. Pendant la fabrication, tous les onglets restent ouverts ; tu peux
+          aussi fermer la page, un carillon et le titre de l&apos;onglet te préviennent.
+        </p>
+      </>
+    );
+  else
+    body = (
+      <TikTokTab v={v} writeCaption={() => run(() => call(`${url}/caption`, "POST").then(refresh), "Claude écrit la légende")} again={again}>
+        <Costs v={v} />
+      </TikTokTab>
+    );
 
-        {v.sources.length > 0 && (
-          <details className="panel" style={{ marginTop: 10 }}>
-            <summary>Sources du script ({v.sources.length})</summary>
-            <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 13 }}>
-              {v.sources.map((s) => (
-                <li key={s} style={{ overflowWrap: "anywhere" }}>
-                  {/^https?:\/\//.test(s) ? (
-                    <a href={s} target="_blank" rel="noopener noreferrer nofollow">
-                      {s}
-                    </a>
-                  ) : (
-                    s
-                  )}
-                </li>
-              ))}
-            </ul>
-          </details>
+  // the action bar: what is going on, and the one thing to do now, always in the same place
+  let msg: React.ReactNode;
+  let acts: React.ReactNode = null;
+  if (who === "err") {
+    msg = (
+      <span className="chip hot" role="alert" style={{ whiteSpace: "normal" }}>
+        <span className="dot" />
+        {v.error ?? "Quelque chose a échoué."}
+      </span>
+    );
+    acts = (
+      <>
+        {step === 2 && v.beats.length > 0 && (
+          <button
+            className="btn"
+            onClick={() => {
+              setBoard(true);
+              open(2);
+            }}
+          >
+            <Hand size={15} /> Mettre mes images
+          </button>
         )}
-
-        <Dock
-          v={v}
-          sel={sel}
-          inputRef={cmd}
-          onSent={(r) => {
-            track(r.beatId, r.kind, r.kind === "images" ? r.instruction : undefined);
-            void run(async () => null, `Correction envoyée sur ${r.beatId}`);
+        <button className="btn primary" title="Reprend là où ça s'est arrêté : ce qui est déjà fait n'est pas refait" onClick={() => run(() => call(`${url}/resume`, "POST").then(refresh), "Reprise lancée")}>
+          <RotateCcw size={15} /> Reprendre
+        </button>
+      </>
+    );
+  } else if (step === 0 && who === "run") {
+    msg = (
+      <>
+        <Disc size={20} />
+        <span>
+          <b>{rewriting(v) ? "Claude réécrit le script." : "Claude écrit."}</b> Rien à faire : la vidéo passe dans « À toi » quand c&apos;est prêt.
+        </span>
+      </>
+    );
+    acts = (
+      <Link className="btn" href="/">
+        Lancer une autre chanson
+      </Link>
+    );
+  } else if (step === 0) {
+    msg = (
+      <span>
+        <b>Relis l&apos;histoire.</b> Rien n&apos;est dépensé en voix ni en images avant ta validation.
+      </span>
+    );
+    acts = (
+      <button className="btn primary lg" disabled={scriptPending || tooShort(script)} onClick={() => void sendScript({ action: "approve", draft: script.trim() }, "Script validé, on lance la suite")}>
+        <Check size={17} /> Valider le script
+      </button>
+    );
+  } else if (step === 1 && who === "run") {
+    msg = v.beats.length ? (
+      <>
+        <LineBusy voice />
+        <span>
+          <b>Voix {count}.</b> Tu peux relire le texte ; l&apos;onglet Voix s&apos;allume quand c&apos;est à toi.
+        </span>
+      </>
+    ) : (
+      <>
+        <Disc size={20} />
+        <span>
+          <b>Découpage en plans.</b> Ton texte reste lisible dans Histoire.
+        </span>
+      </>
+    );
+    if (v.beats.length && tab !== 1)
+      acts = (
+        <button className="btn" onClick={() => open(1)}>
+          Voir l&apos;onglet Voix
+        </button>
+      );
+  } else if (step === 1) {
+    const waitVoice = v.busy.length > 0 || voiceMissing(v);
+    msg = (
+      <span>
+        <b>La voix te va ?</b> Les images ne sont cherchées qu&apos;après.
+      </span>
+    );
+    acts = (
+      <>
+        <button
+          className="btn"
+          disabled={waitVoice}
+          title={waitVoice ? "Une ligne attend encore sa voix" : "Aucune recherche payante : tu prends les images sur Pinterest (la pochette et la légende sont faites quand même)"}
+          onClick={() => {
+            setBoard(true);
+            void run(() => call(`${url}/voice`, "POST", { manual: true }).then(refresh), "Voix validée : à toi les images");
           }}
-          onError={(m) => flash(m, true)}
-        />
-      </main>
+        >
+          <Hand size={15} /> Je cherche moi-même
+        </button>
+        <button
+          className="btn primary lg"
+          disabled={waitVoice}
+          title={waitVoice ? "Une ligne attend encore sa voix" : "Pinterest via Apify, environ 1 $ par vidéo"}
+          onClick={() => run(() => call(`${url}/voice`, "POST", {}).then(refresh), "Voix validée : recherche des images")}
+        >
+          <Mic size={17} /> Valider · la Régie cherche
+        </button>
+      </>
+    );
+  } else if (step === 2 && who === "run") {
+    msg = (
+      <>
+        <Disc size={20} />
+        <span>
+          <b>Images {count}.</b> L&apos;aperçu se remplit en direct.
+        </span>
+      </>
+    );
+  } else if (step === 2) {
+    msg = (
+      <span>
+        <b>
+          {missing.length} {missing.length > 1 ? "images à trouver" : "image à trouver"}.
+        </b>{" "}
+        Une case par idée ; tu peux aussi laisser la Régie chercher une case.
+      </span>
+    );
+    acts = (
+      <button className="btn primary lg" onClick={() => open(3)}>
+        Passer au montage
+      </button>
+    );
+  } else if (step === 4 || (step === 3 && who === "run")) {
+    msg = (
+      <>
+        <Disc size={20} />
+        <span>
+          {step === 4 ? (
+            <>
+              <b>Fabrication du MP4 {count}.</b> Tu peux continuer à lire, ou fermer : un carillon te prévient.
+            </>
+          ) : (
+            <>
+              <b>La Régie remonte la vidéo autrement.</b> Mêmes mots, même voix, mêmes images.
+            </>
+          )}
+        </span>
+      </>
+    );
+    acts = (
+      <button className="btn primary lg" disabled>
+        <Film size={17} /> {step === 4 ? "Fabrication…" : "Fabriquer le MP4"}
+      </button>
+    );
+  } else if (step === 3) {
+    msg = (
+      <>
+        {missing.length > 0 && (
+          <button className="chip warn" onClick={goMissing} title="Aller au premier, puis « Ma photo » ou « Autres images »">
+            <span className="dot" />
+            {missing.length} {missing.length > 1 ? "plans sans image" : "plan sans image"} → {missing[0]!.id}
+          </button>
+        )}
+        <span>
+          <b>L&apos;aperçu est la vidéo finale.</b>{" "}
+          {v.download ? "Des plans ont changé depuis le dernier MP4." : "Corrige ce qui ne va pas, sinon fabrique le fichier."}
+        </span>
+      </>
+    );
+    acts = (
+      <button className="btn primary lg" disabled={!canRender} onClick={render} title="L'aperçu est déjà la vidéo montée : ce bouton en fabrique le fichier MP4 (seuls les plans modifiés)">
+        <Film size={17} /> {v.download ? "Refabriquer le MP4" : "Fabriquer le MP4"}
+      </button>
+    );
+  } else {
+    const tiktok = v.tiktok.configured && v.tiktok.connected;
+    msg =
+      who === "done" ? (
+        <span>
+          <b>Dans ta boîte TikTok.</b> Il reste le son et la légende, dans l&apos;app.
+        </span>
+      ) : (
+        <>
+          <span className="chip ok">
+            <span className="dot" />
+            MP4 à jour
+          </span>
+          <span>Télécharge-le ou envoie-le sur TikTok.</span>
+        </>
+      );
+    acts =
+      who === "done" ? (
+        <>
+          {v.caption && <CopyCaption text={v.caption} label="Copier la légende" />}
+          <Link className="btn dark lg" href="/">
+            Vidéo suivante
+          </Link>
+        </>
+      ) : (
+        <>
+          {v.download && (
+            <a className={`btn${tiktok ? "" : " primary lg"}`} href={v.download} download title="Le fichier de la vidéo, telle que dans l'aperçu">
+              <Download size={15} /> Télécharger
+            </a>
+          )}
+          <SendToTikTok v={v} onQueued={queued} flash={flash} big />
+        </>
+      );
+  }
+
+  return (
+    <div className="fil" style={{ "--side": `${side}px` } as React.CSSProperties}>
+      <header className="fil-top">
+        <Link href="/" className="btn ghost sm" aria-label="Retour à la file">
+          <ArrowLeft size={16} />
+        </Link>
+        <h1 className="t">
+          {v.title} <span>· {v.artist}</span>
+        </h1>
+        <span className="sp">
+          <StatusChip status={v.status}>{v.total > 0 && <span className="mono">{tc(v.total)}</span>}</StatusChip>
+          <button className="btn sm" onClick={() => run(() => call(`${url}/undo`, "POST"), "Retour en arrière")} disabled={v.version <= 1 || reading(v)}>
+            <Undo2 size={15} /> <span className="wide-only">Annuler</span>
+          </button>
+          <details className="menu">
+            <summary className="btn ghost sm" aria-label="Plus">
+              <MoreHorizontal size={16} />
+            </summary>
+            <div className="menu-pop">
+              <DeleteVideo id={v.id} labelled />
+            </div>
+          </details>
+        </span>
+      </header>
+
+      <nav className="piste" aria-label="Étapes de la vidéo">
+        {STEPS.map((s, i) => {
+          const state = i < step || (i === step && who === "done") ? "done" : i === step ? (who === "run" ? "run" : "you") : "todo";
+          const note = state === "done" ? "fait" : state === "run" ? "en cours" : state === "you" ? (who === "err" ? "bloqué" : "à toi") : "";
+          return (
+            <button key={s.title} className={`${state}${tab === i ? " on" : ""}`} disabled={!reachable(v, step, i)} aria-current={tab === i ? "step" : undefined} onClick={() => open(i)}>
+              <span className="n">
+                {state === "run" && <Disc size={11} label={false} />}0{i + 1} {note}
+              </span>
+              <span className="tt">{s.title}</span>
+              <span className="s">{s.sub}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <main className="fil-main">{body}</main>
 
       <aside className="fil-side">
         <Divider width={side} onResize={resize} />
         <div ref={stageRef} className={`stagebox${full ? " full" : ""}`}>
           <div className="phone">
-            {frames.map((f, i) => (
-              <iframe
-                key={f.src}
-                ref={(el) => {
-                  if (el) refs.current.set(f.src, el);
-                  else refs.current.delete(f.src);
-                }}
-                src={f.src}
-                title="Aperçu de la vidéo"
-                sandbox="allow-scripts"
-                className={!f.ready ? "loading" : i < frames.length - 1 ? "stale" : undefined}
-                aria-hidden={i < frames.length - 1 || undefined}
+            {v.beats.length === 0 ? (
+              <span className="phone-wait">L&apos;aperçu arrive avec la voix</span>
+            ) : (
+              frames.map((f, i) => (
+                <iframe
+                  key={f.src}
+                  ref={(el) => {
+                    if (el) refs.current.set(f.src, el);
+                    else refs.current.delete(f.src);
+                  }}
+                  src={f.src}
+                  title="Aperçu de la vidéo"
+                  sandbox="allow-scripts"
+                  className={!f.ready ? "loading" : i < frames.length - 1 ? "stale" : undefined}
+                  aria-hidden={i < frames.length - 1 || undefined}
+                />
+              ))
+            )}
+          </div>
+          {v.beats.length > 0 && (
+            <div className="transport">
+              <audio ref={voice} src={voiceSrc ?? undefined} preload="auto" />
+              <button className="btn sm" onClick={togglePlay} aria-label={playing ? "Pause" : "Lecture"}>
+                {playing ? <Pause size={15} /> : <Play size={15} />}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={Math.max(0.1, v.total)}
+                step={0.05}
+                value={Math.min(t, v.total)}
+                onChange={(e) => seekTo(Number(e.target.value))}
+                aria-label="Position"
+                style={{ "--fill": `${(Math.min(t, v.total) / Math.max(0.1, v.total)) * 100}%` } as React.CSSProperties}
               />
-            ))}
-          </div>
-          <div className="transport">
-            <audio ref={voice} src={voiceSrc ?? undefined} preload="auto" />
-            <button className="btn sm" onClick={togglePlay} aria-label={playing ? "Pause" : "Lecture"}>
-              {playing ? <Pause size={15} /> : <Play size={15} />}
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={Math.max(0.1, v.total)}
-              step={0.05}
-              value={Math.min(t, v.total)}
-              onChange={(e) => seekTo(Number(e.target.value))}
-              aria-label="Position"
-              style={{ "--fill": `${(Math.min(t, v.total) / Math.max(0.1, v.total)) * 100}%` } as React.CSSProperties}
-            />
-            <span className="mono mute">{tc(t)}</span>
-            <button className="btn sm" onClick={toggleFull} aria-label={full ? "Quitter le plein écran" : "Plein écran"} title={full ? "Quitter le plein écran (Échap)" : "Plein écran"}>
-              {full ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-            </button>
-          </div>
+              <span className="mono mute">{tc(t)}</span>
+              <button className="btn sm" onClick={toggleFull} aria-label={full ? "Quitter le plein écran" : "Plein écran"} title={full ? "Quitter le plein écran (Échap)" : "Plein écran"}>
+                {full ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+              </button>
+            </div>
+          )}
         </div>
-        <Caption v={v} write={() => run(() => call(`${url}/caption`, "POST").then(refresh), "Claude écrit la légende")} />
-        <Costs v={v} />
+        <div className="side-extra">
+          {v.angle && (
+            <div className="panel">
+              <span className="eyebrow">Angle</span>
+              <span>{v.angle}</span>
+            </div>
+          )}
+          <button className="panel cost-mini" onClick={() => open(5)} disabled={!reachable(v, step, 5)} title="Le détail est dans l'onglet TikTok">
+            <span className="eyebrow">Ce que coûte cette vidéo</span>
+            <span className="mono">{usd(v.spent)}</span>
+          </button>
+        </div>
       </aside>
 
-      {done && v.download && <Sleeve title={v.title} artist={v.artist} href={v.download} onClose={() => setDone(false)} />}
+      <footer className="actbar">
+        <div className="msg">{msg}</div>
+        {acts && <div className="acts">{acts}</div>}
+      </footer>
 
       {toast && (
         <div className={`toast${toast.err ? " err" : ""}`} role="status">
@@ -697,6 +904,7 @@ function BeatRow({
   onChoose,
   patch,
   action,
+  ask,
   notify,
 }: {
   b: BeatView;
@@ -707,6 +915,7 @@ function BeatRow({
   onChoose: () => void;
   patch: (p: BeatPatch, ok?: string) => void;
   action: (a: "images" | "clean" | "voice" | "rewrite", instruction?: string, ok?: string) => void;
+  ask: (input: string) => Promise<boolean>;
   notify: Notify;
 }) {
   const img = b.image ? v.images[b.image] : b.layout === "vinyl" && v.cover ? v.images[v.cover] : undefined;
@@ -741,7 +950,7 @@ function BeatRow({
           )}
         </span>
       </button>
-      {selected && <Inspector b={b} v={v} busy={busy} job={job} patch={patch} action={action} notify={notify} />}
+      {selected && <Inspector b={b} v={v} busy={busy} job={job} patch={patch} action={action} ask={ask} notify={notify} />}
     </div>
   );
 }
@@ -753,6 +962,7 @@ function Inspector({
   job,
   patch,
   action,
+  ask,
   notify,
 }: {
   b: BeatView;
@@ -761,16 +971,19 @@ function Inspector({
   job?: Job;
   patch: (p: BeatPatch, ok?: string) => void;
   action: (a: "images" | "clean" | "voice" | "rewrite", instruction?: string, ok?: string) => void;
+  ask: (input: string) => Promise<boolean>;
   notify: Notify;
 }) {
   const [text, setText] = useState(b.text);
   useEffect(() => setText(b.text), [b.text]);
-  // the instruction for Claude, asked in place (null when the box is closed)
-  const [ask, setAsk] = useState<string | null>(null);
-  const sendAsk = () => {
-    if (!ask?.trim()) return;
-    action("rewrite", ask.trim(), "Claude retouche la phrase…");
-    setAsk(null);
+  // the one way to ask Claude about this line: a new search or a rewrite, Claude's route decides
+  const [wish, setWish] = useState("");
+  const [asking, setAsking] = useState(false);
+  const sendAsk = async () => {
+    if (!wish.trim() || asking) return;
+    setAsking(true);
+    if (await ask(wish.trim())) setWish("");
+    setAsking(false);
   };
   const [drag, setDrag] = useState(false);
   // « Ma photo »: the file goes as it is, the worker cleans it and shows it on this line
@@ -943,170 +1156,105 @@ function Inspector({
         </div>
       </div>
 
-      <div className="grp">
-        <span className="lab">Mise en page</span>
-        <div className="chips">
-          {LAYOUTS.map((l) => (
-            <button key={l} className="pick" aria-pressed={b.layout === l} onClick={() => patch({ layout: l })}>
-              {LAYOUT_LABELS[l]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grp">
-        <span className="lab">Entrée</span>
-        <div className="chips">
-          {ENTRANCES.map((en) => (
-            <button key={en} className="pick" aria-pressed={b.entrance === en} onClick={() => patch({ entrance: en })}>
-              {ENTRANCE_LABELS[en]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grp">
-        <span className="lab" title="Choisi tout seul d'après la phrase ; à changer seulement si le choix ne te plaît pas">Geste</span>
-        <div className="chips">
-          {MOVES.map((m) => (
-            <button key={m} className="pick" aria-pressed={b.move === m} onClick={() => patch({ move: m })}>
-              {MOVE_LABELS[m]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grp">
-        <span className="lab">Réglages</span>
-        <div className="chips" style={{ alignItems: "center" }}>
-          <button className="pick" aria-pressed={b.reveal === "type"} onClick={() => patch({ reveal: b.reveal === "type" ? "fade" : "type" })}>
-            {b.reveal === "type" ? "Lettres tapées" : "Gris puis noir"}
+      {v.providers.claude && (
+        <form
+          className="ask-bar"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void sendAsk();
+          }}
+        >
+          <Wand2 size={15} className="mute" />
+          <input
+            value={wish}
+            onChange={(e) => setWish(e.target.value)}
+            maxLength={500}
+            placeholder="Demander à Claude : « une photo plus vieille », « plus court »…"
+            aria-label={`Demander à Claude pour ${b.id}`}
+            disabled={busy}
+          />
+          <button className="btn dark sm" type="submit" disabled={busy || asking || !wish.trim()}>
+            {asking ? <Loader2 size={14} className="spin" /> : null} Envoyer
           </button>
-          <button className="pick" aria-pressed={b.accent} onClick={() => patch({ accent: !b.accent })}>
-            Couleur de l&apos;image sur le mot
-          </button>
-          <button
-            className="pick"
-            aria-pressed={b.italic}
-            onClick={() => patch({ italic: !b.italic })}
-            title="Pour un titre de chanson ou un mot d'aveu, environ une phrase sur cinq"
-            style={{ fontStyle: "italic" }}
-          >
-            Italique
-          </button>
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-            Pause après
-            <input
-              type="range"
-              min={0}
-              max={3}
-              step={0.1}
-              defaultValue={b.gap}
-              key={`${b.id}-${b.gap}`}
-              style={{ "--fill": `${(b.gap / 3) * 100}%` } as React.CSSProperties}
-              onInput={(e) => e.currentTarget.style.setProperty("--fill", `${(Number(e.currentTarget.value) / 3) * 100}%`)}
-              onPointerUp={(e) => patch({ gap: Number((e.target as HTMLInputElement).value) })}
-              onKeyUp={(e) => patch({ gap: Number((e.target as HTMLInputElement).value) })}
-            />
-            <span className="mono">{b.gap.toFixed(1)} s</span>
-          </label>
+        </form>
+      )}
+
+      <details className="retouches">
+        <summary>Retouches de montage · page, entrée, geste, pause (choisies toutes seules)</summary>
+        <div className="grp">
+          <span className="lab">Mise en page</span>
+          <div className="chips">
+            {LAYOUTS.map((l) => (
+              <button key={l} className="pick" aria-pressed={b.layout === l} onClick={() => patch({ layout: l })}>
+                {LAYOUT_LABELS[l]}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+        <div className="grp">
+          <span className="lab">Entrée</span>
+          <div className="chips">
+            {ENTRANCES.map((en) => (
+              <button key={en} className="pick" aria-pressed={b.entrance === en} onClick={() => patch({ entrance: en })}>
+                {ENTRANCE_LABELS[en]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grp">
+          <span className="lab">Geste</span>
+          <div className="chips">
+            {MOVES.map((m) => (
+              <button key={m} className="pick" aria-pressed={b.move === m} onClick={() => patch({ move: m })}>
+                {MOVE_LABELS[m]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grp">
+          <span className="lab">Texte</span>
+          <div className="chips" style={{ alignItems: "center" }}>
+            <button className="pick" aria-pressed={b.reveal === "type"} onClick={() => patch({ reveal: b.reveal === "type" ? "fade" : "type" })}>
+              {b.reveal === "type" ? "Lettres tapées" : "Gris puis noir"}
+            </button>
+            <button className="pick" aria-pressed={b.accent} onClick={() => patch({ accent: !b.accent })}>
+              Couleur de l&apos;image sur le mot
+            </button>
+            <button
+              className="pick"
+              aria-pressed={b.italic}
+              onClick={() => patch({ italic: !b.italic })}
+              title="Pour un titre de chanson ou un mot d'aveu, environ une phrase sur cinq"
+              style={{ fontStyle: "italic" }}
+            >
+              Italique
+            </button>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+              Pause après
+              <input
+                type="range"
+                min={0}
+                max={3}
+                step={0.1}
+                defaultValue={b.gap}
+                key={`${b.id}-${b.gap}`}
+                style={{ "--fill": `${(b.gap / 3) * 100}%` } as React.CSSProperties}
+                onInput={(e) => e.currentTarget.style.setProperty("--fill", `${(Number(e.currentTarget.value) / 3) * 100}%`)}
+                onPointerUp={(e) => patch({ gap: Number((e.target as HTMLInputElement).value) })}
+                onKeyUp={(e) => patch({ gap: Number((e.target as HTMLInputElement).value) })}
+              />
+              <span className="mono">{b.gap.toFixed(1)} s</span>
+            </label>
+          </div>
+        </div>
+      </details>
 
       <div className="chips">
         <button className="btn sm" disabled={busy} onClick={() => action("voice", undefined, "La voix de cette phrase se refait")}>
           <Mic size={14} /> Refaire la voix
         </button>
-        {v.providers.claude && ask === null && (
-          <button className="btn sm" disabled={busy} onClick={() => setAsk("")}>
-            <Wand2 size={14} /> Retoucher avec Claude
-          </button>
-        )}
       </div>
-      {ask !== null && (
-        <form
-          className="ask"
-          onSubmit={(e) => {
-            e.preventDefault();
-            sendAsk();
-          }}
-        >
-          <label htmlFor={`ask-${b.id}`}>Que doit changer Claude sur cette phrase ?</label>
-          <textarea
-            id={`ask-${b.id}`}
-            autoFocus
-            value={ask}
-            maxLength={1000}
-            placeholder="« plus court », « une image plus ancienne », « mets l'accent sur la date »…"
-            onChange={(e) => setAsk(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setAsk(null);
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendAsk();
-              }
-            }}
-          />
-          <div className="chips">
-            <button className="btn primary sm" type="submit" disabled={busy || !ask.trim()}>
-              <Wand2 size={14} /> Envoyer à Claude
-            </button>
-            <button className="btn ghost sm" type="button" onClick={() => setAsk(null)}>
-              Annuler
-            </button>
-          </div>
-        </form>
-      )}
     </div>
-  );
-}
-
-function Dock({
-  v,
-  sel,
-  inputRef,
-  onSent,
-  onError,
-}: {
-  v: VideoView;
-  sel: string | null;
-  inputRef: React.RefObject<HTMLInputElement | null>;
-  onSent: (r: { beatId: string; kind: "images" | "rewrite"; instruction: string }) => void;
-  onError: (m: string) => void;
-}) {
-  const [value, setValue] = useState("");
-  const [sending, setSending] = useState(false);
-  async function send(e: React.FormEvent) {
-    e.preventDefault();
-    if (!value.trim()) return;
-    setSending(true);
-    try {
-      const r = await call(`/api/videos/${v.id}/command`, "POST", { input: value, selected: sel });
-      setValue("");
-      onSent(r);
-    } catch (err) {
-      onError((err as Error).message);
-    } finally {
-      setSending(false);
-    }
-  }
-  return (
-    <form className="dock" onSubmit={send}>
-      <input
-        ref={inputRef}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        maxLength={500}
-        placeholder={v.providers.claude ? `${sel ? `@${sel} ` : "@b08 "}une photo plus vieille, en noir et blanc` : "Mode démo : « @b08 images » cherche d'autres images"}
-        aria-label="Correction"
-      />
-      <span className="mono mute" aria-hidden>
-        /
-      </span>
-      <button className="btn dark sm" disabled={sending || !value.trim()}>
-        {sending ? <Loader2 size={14} className="spin" /> : <Send size={14} />} Corriger
-      </button>
-    </form>
   );
 }
 

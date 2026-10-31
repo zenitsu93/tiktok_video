@@ -7,7 +7,7 @@ import { Download, X } from "lucide-react";
  * "Le Sillon" logo, so waiting looks like the channel and says where things are.
  */
 
-export const PIPELINE = ["Recherche et écriture", "Découpage", "Voix", "Images", "Montage"] as const;
+export const PIPELINE = ["Recherche et écriture", "Découpage", "Voix", "Images", "Fichier vidéo"] as const;
 
 /** Maps the worker's progress step to a pipeline stage. */
 export function stageOf(step: string | undefined, rendering: boolean): number {
@@ -16,7 +16,7 @@ export function stageOf(step: string | undefined, rendering: boolean): number {
   if (/découpage/i.test(step)) return 1;
   if (/voix/i.test(step)) return 2;
   if (/image/i.test(step)) return 3;
-  if (/montage/i.test(step)) return 4;
+  if (/fichier|montage/i.test(step)) return 4;
   return 0;
 }
 

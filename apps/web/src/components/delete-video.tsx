@@ -8,7 +8,8 @@ import { useEffect, useState } from "react";
  * Deletes the video for good, with its images, voice and exports. The first click only
  * arms the button; a second one within a few seconds deletes and goes back to the list.
  */
-export function DeleteVideo({ id, short = false }: { id: string; short?: boolean }) {
+/** `labelled`: in a menu, the button says what it does. */
+export function DeleteVideo({ id, short = false, labelled = false }: { id: string; short?: boolean; labelled?: boolean }) {
   const router = useRouter();
   const [armed, setArmed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -49,6 +50,7 @@ export function DeleteVideo({ id, short = false }: { id: string; short?: boolean
   ) : (
     <button className="btn ghost sm" onClick={() => setArmed(true)} title={failed ?? "Supprimer la vidéo, ses images, sa voix et ses exports"} aria-label="Supprimer la vidéo">
       <Trash2 size={15} />
+      {labelled && "Supprimer la vidéo"}
       {failed && <span className="chip hot">{failed}</span>}
     </button>
   );
