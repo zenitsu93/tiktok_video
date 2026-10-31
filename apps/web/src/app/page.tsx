@@ -1,4 +1,4 @@
-import { getDb, lastTikTokSend, listVideos } from "@regie/db";
+import { expireTikTokSends, getDb, lastTikTokSend, listVideos } from "@regie/db";
 import { providers } from "@regie/server";
 import { Gauge } from "lucide-react";
 import Link from "next/link";
@@ -47,6 +47,7 @@ function place(v: Row, send: Awaited<ReturnType<typeof lastTikTokSend>>): { grou
       if (v.publishedAt) return { group: "publiees", label: `Publiée · ${day(v.publishedAt)}`, tone: "ok", step: 6 };
       const current = send && send.renderAsset === v.renderAsset ? send : null;
       if (current && (current.status === "sending" || current.status === "processing")) return { group: "cours", label: "Envoi sur TikTok", tone: "run", step: 5 };
+      if (current?.status === "unconfirmed") return { group: "apublier", label: "Envoyée · TikTok n'a pas confirmé", tone: "warn", step: 5 };
       if (current?.status === "inbox") return { group: "apublier", label: `Dans ta boîte TikTok · ${day(current.createdAt)}`, tone: "warn", step: 5 };
       if (current?.status === "error") return { group: "apublier", label: "Envoi échoué · à renvoyer", tone: "hot", step: 5 };
       if (v.downloadedAt) return { group: "apublier", label: `Téléchargée · ${day(v.downloadedAt)}`, tone: "warn", step: 5 };
@@ -67,6 +68,7 @@ function leftAgo(v: Row, send: Awaited<ReturnType<typeof lastTikTokSend>>): stri
 export default async function Home() {
   await ownerOrLogin();
   const db = getDb();
+  await expireTikTokSends(db);
   const videos = await listVideos(db);
   const sends = await Promise.all(videos.map((v) => lastTikTokSend(db, v.id)));
   const rows = videos.map((v, i) => ({ v, ...place(v, sends[i]), ask: leftAgo(v, sends[i]) }));

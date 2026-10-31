@@ -1,4 +1,4 @@
-import { closeDb, getDb, setError, setProgress, setStatus } from "@regie/db";
+import { closeDb, expireTikTokSends, getDb, setError, setProgress, setStatus } from "@regie/db";
 import { BudgetError, env, jobData, JOBS, providers, queue, retryLimit, type JobName } from "@regie/server";
 import { cleanup } from "./cleanup";
 import { caption, cleanImage, generate, ownImage, moreImages, prerender, render, restyle, reviseScript, revoice, rewrite } from "./pipeline";
@@ -68,6 +68,14 @@ await boss.work(JOBS.prerender, { localConcurrency: 1 }, async ([job]) => {
 // every night at 4:00 (UTC); a missed night is caught up by the next one
 await boss.schedule(JOBS.cleanup, "0 4 * * *");
 await boss.work(JOBS.cleanup, () => cleanup());
+
+// sends left hanging (worker restarted mid-send, job lost, TikTok silent) stop showing « en cours »
+const unstick = () =>
+  expireTikTokSends(getDb())
+    .then((n) => n && console.log(`[tiktok] ${n} envoi(s) bloqué(s) débloqué(s)`))
+    .catch((e) => console.warn("[tiktok] déblocage :", (e as Error).message));
+await unstick();
+setInterval(unstick, 5 * 60_000).unref();
 
 console.log("[worker] prêt");
 

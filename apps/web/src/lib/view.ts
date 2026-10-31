@@ -1,5 +1,5 @@
 import { timeBeats, voiceStale, type Beat, type Layout, type Entrance, type Move } from "@regie/core";
-import { getDb, lastTikTokSend, listPronunciations, videoCosts, type TikTokSendStatus, type VideoRow } from "@regie/db";
+import { expireTikTokSends, getDb, lastTikTokSend, listPronunciations, videoCosts, type TikTokSendStatus, type VideoRow } from "@regie/db";
 import { dirtyBeats, providers, signMedia, tiktokConfigured, tiktokConnected } from "@regie/server";
 
 /** What the browser gets for one video: the script, timings, signed image links, costs. No secrets, no storage keys. */
@@ -96,6 +96,8 @@ export async function videoView(row: VideoRow): Promise<VideoView> {
     if (a?.kind === "image") images[id] = { url: signMedia(id, 6 * 3600), accent: a.accent ?? null, w: a.width, h: a.height, clean: a.clean, checker: a.checker };
     else if (a?.kind === "video" && a.poster) images[id] = { url: signMedia(a.poster, 6 * 3600), accent: a.accent ?? null, w: a.width, h: a.height, clip: signMedia(id, 6 * 3600) };
   }
+  // even with the worker down, a send stuck for over twenty minutes stops showing « en cours »
+  await expireTikTokSends(getDb());
   const send = await lastTikTokSend(getDb(), row.id);
   const pronunciations = await listPronunciations(getDb());
   const lexicon = Object.fromEntries(pronunciations.map((p) => [p.word, p.say]));

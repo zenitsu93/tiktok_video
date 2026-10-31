@@ -81,6 +81,8 @@ export async function enqueue<N extends JobName>(name: N, data: JobData<N>): Pro
     retryLimit: retryLimit(name),
     retryDelay: 10,
     retryBackoff: true,
+    // a send follows TikTok for fifteen minutes after the upload: pg-boss's default (15 min) cut it short
+    expireInSeconds: name === JOBS.tiktok ? 30 * 60 : undefined,
     singletonKey: name === JOBS.render || name === JOBS.prerender ? (parsed as JobData<typeof JOBS.render>).videoId : undefined,
   });
 }
